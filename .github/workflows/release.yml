@@ -1,0 +1,38 @@
+name: Release
+
+on:
+  release:
+    types:
+    - published
+
+jobs:
+  push_to_registry:
+    name: Push to DockerHub
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+    - name: Hermit
+      run: ./bin/hermit env -r >> $GITHUB_ENV
+    - name: Login to Docker Hub
+      uses: docker/login-action@v1
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+    - name: Extract metadata (tags, labels)
+      id: meta
+      uses: docker/metadata-action@v3.6.0
+      with:
+        images: cashapp/cmmc
+        tags: |
+          type=semver,pattern=v{{version}}
+    - name: Build and push Docker image
+      id: build_push
+      uses: docker/build-push-action@v2.7.0
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+    - name: Image digest
+      run: echo ${{ steps.build_push.outputs.digest }}
