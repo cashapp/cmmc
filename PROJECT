@@ -1,0 +1,25 @@
+domain: cmmc.k8s.cash.app
+layout:
+- go.kubebuilder.io/v3
+projectName: cmmc
+repo: github.com/cashapp/cmmc
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: cmmc.k8s.cash.app
+  group: config
+  kind: MergeSource
+  path: github.com/cashapp/cmmc/api/v1beta1
+  version: v1beta1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: cmmc.k8s.cash.app
+  group: config
+  kind: MergeTarget
+  path: github.com/cashapp/cmmc/api/v1beta1
+  version: v1beta1
+version: "3"

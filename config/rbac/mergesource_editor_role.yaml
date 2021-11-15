@@ -1,0 +1,24 @@
+# permissions for end users to edit mergesources.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: mergesource-editor-role
+rules:
+- apiGroups:
+  - cmmc.cmmc.k8s.cash.app
+  resources:
+  - mergesources
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cmmc.cmmc.k8s.cash.app
+  resources:
+  - mergesources/status
+  verbs:
+  - get

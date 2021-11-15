@@ -1,0 +1,24 @@
+# permissions for end users to edit mergetargets.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: mergetarget-editor-role
+rules:
+- apiGroups:
+  - cmmc.cmmc.k8s.cash.app
+  resources:
+  - mergetargets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cmmc.cmmc.k8s.cash.app
+  resources:
+  - mergetargets/status
+  verbs:
+  - get

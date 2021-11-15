@@ -1,0 +1,80 @@
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: manager-role
+rules:
+- apiGroups:
+  - config.cmmc.k8s.cash.app
+  resources:
+  - mergesources
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - config.cmmc.k8s.cash.app
+  resources:
+  - mergesources/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - config.cmmc.k8s.cash.app
+  resources:
+  - mergesources/status
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+- apiGroups:
+  - config.cmmc.k8s.cash.app
+  resources:
+  - mergetargets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - config.cmmc.k8s.cash.app
+  resources:
+  - mergetargets/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - config.cmmc.k8s.cash.app
+  resources:
+  - mergetargets/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+  - list
+  - watch

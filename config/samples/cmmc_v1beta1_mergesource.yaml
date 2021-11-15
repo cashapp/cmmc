@@ -1,0 +1,12 @@
+apiVersion: config.cmmc.k8s.cash.app/v1beta1
+kind: MergeSource
+metadata:
+  name: sample-merge-source
+spec:
+  selector:
+    cmmc.k8s.cash.app/merge: "merge-source"
+  source:
+    data: key
+  target:
+    name: sample-merge-target
+    data: key

@@ -1,0 +1,10 @@
+apiVersion: config.cmmc.k8s.cash.app/v1beta1
+kind: MergeTarget
+metadata:
+  name: sample-merge-target
+spec:
+  target: merge-target
+  data:
+    key:
+      init: |
+        - "an initial value"
