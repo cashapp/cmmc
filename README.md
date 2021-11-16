@@ -1,26 +1,24 @@
 # ConfigMap Merging Controller (cmmc)
 
-`cmmc` is a k8s operator that operates in cluster and allows for the merging
-of ConfigMap resources based on specific labelling rules and data validation.
+`cmmc` is a k8s operator that allows for the merging of ConfigMap resources with data validation.
 
 ## Why?
 
 The impetus for building this is to have a GitOps friendly solution to manage
-the [`cm kube-system/aws-auth`][1].
+`kube-system/aws-auth`, a ConfigMap that binds AWS roles to K8S Roles in EKS ([link][1]).
 
-Other solutions involve either manual edits, which don't have cleanup, or fully
-custom resources to manage Auth/Roles itself.
-
-Our approach was to have a more generalized watching & merging of configMaps into
-a specific target.
+Instead of solving the problem directly, our approach was to ask the question: 
+If another tool existed that would make this problem trivial to solve that wasn't
+specific to _this specific use-case_, what would it be?
 
 ## Features
 
-- Watch specific keys of ConfigMaps and merge their results
-- JSON Schema Validation for the target ConfigMap
+- Watch specific keys of ConfigMaps and merge their results into a target.
+- JSON Schema Validation for the target ConfigMap (possibly add other validation in the future).
 - Fully Configurable source/target selectors mix and match 
 - Changes to resources are non-destructive and recoverable
 - Permissions gated by namespace selectors (if desired)
+- Metrics exposed for how many resources are being watched/updated, and their states.
 
 ## How
 
@@ -234,3 +232,4 @@ kubectl delete mergetarget kube-system-aws-auth
 ```
 
 [1]: https://docs.aws.amazon.com/eks/latest/userguide/add-user-role.html
+[2]: https://book.kubebuilder.io/
