@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -110,7 +111,7 @@ func (r *MergeSourceReconciler) reconcileMergeSource(
 		New(
 			mergeSourceFinalizerName,
 			func() error {
-				return r.finalizeDeletion(ctx, mergeSource)
+				return r.finalizeDeletion(ctx, mergeSource, watched)
 			},
 			func() error {
 				r.Recorder.RecordNumSources(mergeSource, 0)
@@ -154,7 +155,7 @@ func (r *MergeSourceReconciler) reconcileMergeSource(
 	return false, nil
 }
 
-func (r *MergeSourceReconciler) finalizeDeletion(ctx context.Context, s *MergeSource) error {
+func (r *MergeSourceReconciler) finalizeDeletion(ctx context.Context, s *MergeSource, w *watchedConfigMap) error {
 	sources, err := r.sources(ctx, s)
 	if err != nil {
 		return err
@@ -162,7 +163,7 @@ func (r *MergeSourceReconciler) finalizeDeletion(ctx context.Context, s *MergeSo
 
 	for _, cm := range sources {
 		cm := cm
-		if err := r.cleanUpWatchedByAnnotation(ctx, &cm); err != nil {
+		if err := r.cleanUpWatchedByAnnotation(ctx, &cm, w.WatchedBy.String()); err != nil {
 			return err
 		}
 	}
@@ -237,33 +238,73 @@ func (r *MergeSourceReconciler) configMapOutput(ctx context.Context, cm corev1.C
 	}
 
 	// ensure selector matched configMap has the watchedByAnnotation,
-	_, ok := cm.GetAnnotations()[watchedByAnnotation]
+	managed, ok := cm.GetAnnotations()[watchedByAnnotation]
 	if !ok {
 		if err := r.annotateWatchedByConfigMap(ctx, &cm, w.WatchedBy.String()); err != nil {
 			return "", errors.Wrap(err, "error updating watchedBy annotation on configMap")
 		}
-	}
-
-	// possible that some other MergeSource is watching this, we don't
-	// want a double merge, and this would be a weird thing we should error on.
-	//
-	// we may eventually want to support multiple watches/notes.
-	managed := cm.GetAnnotations()[watchedByAnnotation]
-	if managed != w.WatchedBy.String() {
-		log.FromContext(ctx).Info("skipping config map- not managed by us")
-		return "", nil
+	} else if !strings.Contains(managed, w.WatchedBy.String()) {
+		annValues := strings.Split(managed, separator)
+		annValues = append(annValues, w.WatchedBy.String())
+		if err := r.annotateWatchedByConfigMap(ctx, &cm, annValuesToString(annValues)); err != nil {
+			return "", errors.Wrap(err, "error updating watchedBy annotation on configMap")
+		}
 	}
 
 	data := cm.Data[key]
 	return data, nil
 }
 
-func (r *MergeSourceReconciler) cleanUpWatchedByAnnotation(ctx context.Context, cm *corev1.ConfigMap) error {
-	return errors.WithStack(anns.Apply(ctx, r.Client, cm, anns.Remove(watchedByAnnotation)))
+// Delete the annotation if there is no merge source watching the configmap
+// Otherwise, remove the mergesource from the annotations
+func (r *MergeSourceReconciler) cleanUpWatchedByAnnotation(ctx context.Context, cm *corev1.ConfigMap, name string) error {
+	managed, ok := cm.GetAnnotations()[watchedByAnnotation]
+	if !ok {
+		return nil
+	}
+
+	annValues := removeAnnValue(strings.Split(managed, separator), name)
+
+	if len(annValues) == 0 {
+		return errors.WithStack(anns.Apply(ctx, r.Client, cm, anns.Remove(watchedByAnnotation)))
+	} else {
+		return r.annotateWatchedByConfigMap(ctx, cm, annValuesToString(annValues))
+	}
 }
 
 func (r *MergeSourceReconciler) annotateWatchedByConfigMap(ctx context.Context, cm *corev1.ConfigMap, name string) error {
 	return errors.WithStack(anns.Apply(ctx, r.Client, cm, anns.Add(watchedByAnnotation, name)))
+}
+
+func removeAnnValue(annValues []string, annValue string) []string {
+	index := getAnnValuesIndex(annValues, annValue)
+
+	if index != -1 {
+		// https://yourbasic.org/golang/delete-element-slice/
+		// Remove the element at index i from a.
+		annValues[index] = annValues[len(annValues)-1] // Copy last element to index i.
+		annValues[len(annValues)-1] = ""               // Erase last element (write zero value).
+		annValues = annValues[:len(annValues)-1]       // Truncate slice.
+	}
+
+	return annValues
+}
+
+func getAnnValuesIndex(annValues []string, annValue string) int {
+	for i, av := range annValues {
+		if av == annValue {
+			return i
+		}
+	}
+	return -1
+}
+
+func annValuesToString(annValues []string) string {
+	output := ""
+	for _, av := range annValues {
+		output += av + separator
+	}
+	return strings.TrimSuffix(output, separator)
 }
 
 type watchedConfigMap struct {
@@ -302,7 +343,7 @@ func (r *MergeSourceReconciler) maybeRemoveWatchedAnnotation(ctx context.Context
 	}
 
 	log.FromContext(ctx).Info("attempting to remove annotation", "config-map", w.Name)
-	err := r.cleanUpWatchedByAnnotation(ctx, &w.Resource)
+	err := r.cleanUpWatchedByAnnotation(ctx, &w.Resource, w.WatchedBy.String())
 	if err != nil {
 		return err
 	}
