@@ -6,6 +6,4 @@ const (
 
 	mergeSourceFinalizerName = "config.cmmc.k8s.cash.app/merge-source-finalizer"
 	mergeTargetFinalizerName = "config.cmmc.k8s.cash.app/merge-target-finalizer"
-
-	separator = ","
 )
