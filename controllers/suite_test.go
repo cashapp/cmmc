@@ -117,13 +117,8 @@ var _ = Describe("MergeSource/Target controllers", func() {
 		interval = time.Millisecond * 250
 	)
 
-	const mapRoles1 = `
-- rolearn: friend
-  usernme: test1
-  groups: [ group1, group2 ]
-`
-
-	var mergeSource *cmmcv1beta1.MergeSource
+	var rolesMergeSource *cmmcv1beta1.MergeSource
+	var usersMergeSource *cmmcv1beta1.MergeSource
 
 	Context("When setting up the MergeSource and ConfigMaps", func() {
 		ctx := context.Background()
@@ -141,6 +136,7 @@ var _ = Describe("MergeSource/Target controllers", func() {
 				},
 				Data: map[string]string{
 					"mapRoles": mapRoles1,
+					"mapUsers": mapUsers1,
 				},
 			}
 			Expect(k8sClient.Create(ctx, cm)).Should(Succeed())
@@ -148,7 +144,7 @@ var _ = Describe("MergeSource/Target controllers", func() {
 
 		It("Annotates the created ConfigMap", func() {
 			By("creating a MergeSource")
-			mergeSource = &cmmcv1beta1.MergeSource{
+			rolesMergeSource = &cmmcv1beta1.MergeSource{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "config.cmmc.k8s.cash.app/v1beta1",
 					Kind:       "MergeSource",
@@ -170,7 +166,30 @@ var _ = Describe("MergeSource/Target controllers", func() {
 					},
 				},
 			}
-			Expect(k8sClient.Create(ctx, mergeSource)).Should(Succeed())
+			usersMergeSource = &cmmcv1beta1.MergeSource{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "config.cmmc.k8s.cash.app/v1beta1",
+					Kind:       "MergeSource",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "aws-auth-map-users-source",
+					Namespace: "default",
+				},
+				Spec: cmmcv1beta1.MergeSourceSpec{
+					Selector: map[string]string{
+						"test-label": "map-roles",
+					},
+					Source: cmmcv1beta1.MergeSourceSourceSpec{
+						Data: "mapUsers",
+					},
+					Target: cmmcv1beta1.MergeSourceTargetSpec{
+						Name: "aws-auth-target",
+						Data: "mapUsers",
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, rolesMergeSource)).Should(Succeed())
+			Expect(k8sClient.Create(ctx, usersMergeSource)).Should(Succeed())
 
 			Eventually(func() string {
 				cm := &corev1.ConfigMap{}
@@ -179,7 +198,7 @@ var _ = Describe("MergeSource/Target controllers", func() {
 					return ""
 				}
 				return cm.GetAnnotations()[watchedByAnnotation]
-			}, timeout, interval).Should(Equal("default/aws-auth-map-roles-source"))
+			}, timeout, interval).Should(Equal("default/aws-auth-map-roles-source,default/aws-auth-map-users-source"))
 		})
 
 		It("creates a target cm", func() {
@@ -197,10 +216,10 @@ var _ = Describe("MergeSource/Target controllers", func() {
 					Target: "default/aws-auth",
 					Data: map[string]cmmcv1beta1.MergeTargetDataSpec{
 						"mapRoles": {Init: ""},
+						"mapUsers": {Init: ""},
 					},
 				},
 			}
-
 			Expect(k8sClient.Create(ctx, target)).Should(Succeed())
 
 			Eventually(func() bool {
@@ -212,14 +231,41 @@ var _ = Describe("MergeSource/Target controllers", func() {
 
 				Expect(cm.GetAnnotations()[managedByMergeTargetAnnotation]).Should(Equal("default/aws-auth-target"))
 				Expect(cm.Data["mapRoles"]).Should(Equal(mapRoles1))
+				Expect(cm.Data["mapUsers"]).Should(Equal(mapUsers1))
 				return true
 			}, timeout, interval).Should(BeTrue())
 		})
 
 		It("cleans up annotations and data when we remove the source", func() {
 			defer GinkgoRecover()
-			Expect(mergeSource).Should(Not(BeNil()))
-			Expect(k8sClient.Delete(ctx, mergeSource)).Should(Succeed())
+			Expect(rolesMergeSource).Should(Not(BeNil()))
+			Expect(k8sClient.Delete(ctx, rolesMergeSource)).Should(Succeed())
+			Eventually(func() (bool, error) {
+				cm := &corev1.ConfigMap{}
+				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: "default", Name: "test-cm1"}, cm)
+				if err != nil {
+					return false, errors.WithStack(err)
+				}
+
+				return cm.GetAnnotations()[watchedByAnnotation] == "default/aws-auth-map-users-source", nil
+			}, timeout, interval).Should(BeTrue())
+
+			Eventually(func() bool {
+				cm := &corev1.ConfigMap{}
+				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: "default", Name: "aws-auth"}, cm)
+				if err != nil {
+					return false
+				}
+
+				Expect(cm.Data["mapRoles"]).Should(Equal(""))
+				Expect(cm.Data["mapUsers"]).Should(Equal(mapUsers1))
+				return true
+			}).Should(BeTrue())
+
+			// delete the second source
+			Expect(usersMergeSource).Should(Not(BeNil()))
+			Expect(k8sClient.Delete(ctx, usersMergeSource)).Should(Succeed())
+
 			Eventually(func() (bool, error) {
 				cm := &corev1.ConfigMap{}
 				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: "default", Name: "test-cm1"}, cm)
@@ -229,6 +275,7 @@ var _ = Describe("MergeSource/Target controllers", func() {
 
 				return cm.GetAnnotations()[watchedByAnnotation] == "", nil
 			}, timeout, interval).Should(BeTrue())
+
 			Eventually(func() bool {
 				cm := &corev1.ConfigMap{}
 				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: "default", Name: "aws-auth"}, cm)
@@ -236,7 +283,7 @@ var _ = Describe("MergeSource/Target controllers", func() {
 					return false
 				}
 
-				Expect(cm.Data["mapRoles"]).Should(Equal(""))
+				Expect(cm.Data["mapUsers"]).Should(Equal(""))
 				return true
 			}).Should(BeTrue())
 		})
@@ -248,3 +295,14 @@ var _ = AfterSuite(func() {
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })
+
+const mapRoles1 = `
+- rolearn: friend
+  usernme: test1
+  groups: [ group1, group2 ]
+`
+const mapUsers1 = `
+- rolearn: friend
+  usernme: test1
+  groups: [ group1, group2 ]
+`
