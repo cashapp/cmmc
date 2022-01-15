@@ -1,0 +1,24 @@
+site_name: ConfigMap Merging Controller
+repo_name: cashapp/cmmc
+repo_url: https://github.com/cashapp/cmmc
+
+theme:
+  name: material
+  palette:
+    primary: red
+    accent: blue
+  features:
+  - navigation.sections
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight:
+      use_pygments: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.critic
+  - pymdownx.caret
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.tilde
