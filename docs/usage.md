@@ -1,16 +1,19 @@
 # Usage
 
-## Installation
-
-* All of these [Kustomization][1] resources are located in the [`config/`][2] directory.
-* Each [release](https://github.com/cashapp/cmmc/releases) of cmmc is also pushed to [dockerhub](https://hub.docker.com/r/cashapp/cmmc/tags).
-
 !!! info cmmc version
 
     Be sure to use the correct version of the operator and the resources!
 
-A very basic install of the operator involves installing the [CRDs], the permissions for the CMMC
-ServiceAccount to be able to watch and modify ConfigMaps, and the controller manager itself.
+## Installation
+
+A very basic install of the operator involves installing the [CRDs], the permissions for
+the CMMC ServiceAccount to be able to watch and modify ConfigMaps, and the controller
+manager itself.
+
+* All of these [Kustomization][1] resources are located in the [`config/`][2] directory.
+* Each [release](https://github.com/cashapp/cmmc/releases) of cmmc is also pushed
+  to [dockerhub](https://hub.docker.com/r/cashapp/cmmc/tags).
+
 
 ```yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
@@ -32,16 +35,21 @@ resources:
 
 ## Metrics
 
-You can also add a `PrometheusMonitor` to scrape the metrics by adding [`config/prometheus`][3]
-to the list.
+| Metric | Type | Description |
+| ------ | ---- | ----------- |
+| `cmmc_resource_condition` | `gauge` | The current condition of the CMMC Resource. |
+| `cmmc_resource_sources` | `gauge` | Number of sources per resource. |
 
-[FIXME][metrics-issue]
+
+You can add a [Prometheus](https://prometheus.io/) Monitor to scrape the metrics by
+adding [`config/prometheus`][3] to the list.
 
 ## Custom Resources
 
-### MergeSource & MergeTarget
-
-See [`MergeTarget`](/resources/mergetarget) and [`MergeSource`](/resources/mergesource) docs.
+| Resource | Purpose | |
+| -------- | ------- | |
+| `MergeTarget` | Manages and validates a target ConfigMap | [docs](/resources/mergetarget) |
+| `MergeSource` | Watches source ConfigMaps for changes and accumulates their data | [docs](/resources/mergesource) |
 
 [1]: https://kubectl.docs.kubernetes.io/guides/introduction/
 [2]: https://github.com/cashapp/cmmc/tree/main/config

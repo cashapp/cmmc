@@ -7,11 +7,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// Recorder is the metrics recorder for cmmc.
 type Recorder struct {
 	sourceGauge    *prometheus.GaugeVec
 	conditionGauge *prometheus.GaugeVec
 }
 
+// NewRecorder creates a Recorder for cmmc.
 func NewRecorder() *Recorder {
 	return &Recorder{
 		sourceGauge: prometheus.NewGaugeVec(
@@ -31,6 +33,7 @@ func NewRecorder() *Recorder {
 	}
 }
 
+// Collectors gets the prometheus collectors from the recorder.
 func (r *Recorder) Collectors() []prometheus.Collector {
 	return []prometheus.Collector{
 		r.sourceGauge,
@@ -38,10 +41,14 @@ func (r *Recorder) Collectors() []prometheus.Collector {
 	}
 }
 
+// RecordNumSources records how many sources a given object has.
+//
+// This can be used for both MergeSource and MergeTarget resources.
 func (r *Recorder) RecordNumSources(o client.Object, count int) {
 	r.sourceGauge.With(resourceLables(o)).Set(float64(count))
 }
 
+// RecordReadyCondition records the ready condition.
 func (r *Recorder) RecordReadyCondition(o hasStatusCondition) {
 	condition := o.FindStatusCondition("Ready")
 	if condition == nil {
@@ -50,6 +57,7 @@ func (r *Recorder) RecordReadyCondition(o hasStatusCondition) {
 	r.RecordCondition(o, *condition)
 }
 
+// RecordCondition records the metav1.Condition for an object.
 func (r *Recorder) RecordCondition(o client.Object, condition metav1.Condition) {
 	for _, status := range []metav1.ConditionStatus{
 		metav1.ConditionTrue,
