@@ -48,8 +48,8 @@ adding [`config/prometheus`][3] to the list.
 
 | Resource | Purpose | |
 | -------- | ------- | |
-| `MergeTarget` | Manages and validates a target ConfigMap | [docs](/resources/mergetarget) |
-| `MergeSource` | Watches source ConfigMaps for changes and accumulates their data | [docs](/resources/mergesource) |
+| `MergeTarget` | Manages and validates a target ConfigMap | [docs](/cmmc/resources/mergetarget) |
+| `MergeSource` | Watches source ConfigMaps for changes and accumulates their data | [docs](/cmmc/resources/mergesource) |
 
 [1]: https://kubectl.docs.kubernetes.io/guides/introduction/
 [2]: https://github.com/cashapp/cmmc/tree/main/config

@@ -11,10 +11,6 @@ Instead of solving the problem directly, the approach was to ask the question:
 _If another tool existed that would make this problem trivial to solve that wasn't
 just for this specific use-case what would it be?_
 
-- [Example for managing `kube-system/aws-auth`](/example/aws-auth).
-- [Usage & deployment docs](/usage).
-- Configuration reference: [`MergeSource`](/resources/mergesource), [`MergeTarget`](/resources/mergetarget).
-
 ## Features
 
 - Watch specific keys of ConfigMaps and merge their results into a target ConfigMap.
@@ -26,7 +22,7 @@ just for this specific use-case what would it be?_
 
 ## Contributing
 
-[See contributing docs](/contributing).
+[See contributing docs](./contributing).
 
 ## License
 
