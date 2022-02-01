@@ -1,6 +1,7 @@
 site_name: ConfigMap Merging Controller
 repo_name: cashapp/cmmc
 repo_url: https://github.com/cashapp/cmmc
+site_url: https://cashapp.github.io/cmmc/
 
 theme:
   name: material
