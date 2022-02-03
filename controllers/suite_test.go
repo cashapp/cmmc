@@ -24,6 +24,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	gtypes "github.com/onsi/gomega/types"
 
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -155,18 +156,22 @@ var _ = Describe("cmmc", func() {
 
 	Context("running the operator", func() {
 
-		assertConfigMapState := func(name types.NamespacedName, forAnnotation string, s *configMapState) {
+		assertConfigMapState := func(name types.NamespacedName, forAnnotation string, match gtypes.GomegaMatcher) {
 			Eventually(
 				func() (*configMapState, error) {
 					var cm corev1.ConfigMap
 					if err := k8sClient.Get(ctx, name, &cm); err != nil {
 						return nil, err
 					}
-					return initConfigMapState(&cm, forAnnotation), nil
+					return &configMapState{
+						MapRoles:   cm.Data["mapRoles"],
+						MapUsers:   cm.Data["mapUsers"],
+						Annotation: cm.GetAnnotations()[forAnnotation],
+					}, nil
 				},
 				timeout,
 				interval,
-			).Should(Equal(s))
+			).Should(match)
 		}
 
 		It("should first have a source ConfigMap", func() {
@@ -197,11 +202,9 @@ var _ = Describe("cmmc", func() {
 			})
 
 			It("should annotate the source ConfigMap", func() {
-				assertConfigMapState(names.sourceCM1, watchedByAnnotation, &configMapState{
-					MapRoles:   mapUsers1,
-					MapUsers:   mapRoles1,
-					Annotation: "default/map-roles-source,default/map-users-source",
-				})
+				assertConfigMapState(names.sourceCM1, watchedByAnnotation, HaveAnnotation(
+					"default/map-roles-source,default/map-users-source",
+				))
 			})
 		})
 
@@ -215,11 +218,11 @@ var _ = Describe("cmmc", func() {
 			})
 
 			It("should create a target ConfigMap based on the MergeTarget", func() {
-				assertConfigMapState(names.targetCM, managedByMergeTargetAnnotation, &configMapState{
+				assertConfigMapState(names.targetCM, managedByMergeTargetAnnotation, Equal(&configMapState{
 					MapRoles:   mapRoles1,
 					MapUsers:   mapUsers1,
 					Annotation: names.target.String(),
-				})
+				}))
 			})
 		})
 
@@ -231,19 +234,19 @@ var _ = Describe("cmmc", func() {
 				})
 
 				It("removes the annotation for roles source", func() {
-					assertConfigMapState(names.sourceCM1, watchedByAnnotation, &configMapState{
+					assertConfigMapState(names.sourceCM1, watchedByAnnotation, Equal(&configMapState{
 						MapRoles:   mapRoles1,
 						MapUsers:   mapUsers1,
 						Annotation: names.usersSource.String(),
-					})
+					}))
 				})
 
 				It("removes the roles from the target", func() {
-					assertConfigMapState(names.targetCM, managedByMergeTargetAnnotation, &configMapState{
+					assertConfigMapState(names.targetCM, managedByMergeTargetAnnotation, Equal(&configMapState{
 						MapRoles:   "",
 						MapUsers:   mapUsers1,
 						Annotation: names.target.String(),
-					})
+					}))
 				})
 			})
 
@@ -254,19 +257,19 @@ var _ = Describe("cmmc", func() {
 				})
 
 				It("removes the annotation for users source", func() {
-					assertConfigMapState(names.sourceCM1, watchedByAnnotation, &configMapState{
+					assertConfigMapState(names.sourceCM1, watchedByAnnotation, Equal(&configMapState{
 						MapRoles:   mapRoles1,
 						MapUsers:   mapUsers1,
 						Annotation: "",
-					})
+					}))
 				})
 
 				It("removes the users from the target", func() {
-					assertConfigMapState(names.targetCM, managedByMergeTargetAnnotation, &configMapState{
+					assertConfigMapState(names.targetCM, managedByMergeTargetAnnotation, Equal(&configMapState{
 						MapRoles:   "",
 						MapUsers:   "",
 						Annotation: names.target.String(),
-					})
+					}))
 				})
 			})
 
@@ -318,20 +321,8 @@ type configMapState struct {
 	Annotation string
 }
 
-func initConfigMapState(cm *corev1.ConfigMap, annotationName string) *configMapState {
-	return &configMapState{
-		MapRoles:   cm.Data["mapRoles"],
-		MapUsers:   cm.Data["mapUsers"],
-		Annotation: cm.GetAnnotations()[annotationName],
-	}
-}
-
-func expectedConfigMapState(roles, users, annotation string) *configMapState {
-	return &configMapState{
-		MapRoles:   roles,
-		MapUsers:   users,
-		Annotation: annotation,
-	}
+func HaveAnnotation(value string) gtypes.GomegaMatcher {
+	return HaveField("Annotation", Equal(value))
 }
 
 func metaFromName(n types.NamespacedName, labels map[string]string) metav1.ObjectMeta {
