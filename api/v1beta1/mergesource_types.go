@@ -99,17 +99,11 @@ func (m *MergeSource) FindStatusCondition(conditionType string) *metav1.Conditio
 	return meta.FindStatusCondition(m.Status.Conditions, conditionType)
 }
 
-func NewMergeSource(namespace, name string, spec MergeSourceSpec) *MergeSource {
+func NewMergeSource(n types.NamespacedName, spec MergeSourceSpec) *MergeSource {
 	return &MergeSource{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: GroupVersion.String(),
-			Kind:       "MergeSource",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-		Spec: spec,
+		TypeMeta:   metav1.TypeMeta{APIVersion: GroupVersion.String(), Kind: "MergeSource"},
+		ObjectMeta: metav1.ObjectMeta{Name: n.Name, Namespace: n.Namespace},
+		Spec:       spec,
 	}
 }
 

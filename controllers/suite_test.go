@@ -25,9 +25,8 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"github.com/pkg/errors"
-
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -41,6 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	cmmcv1beta1 "github.com/cashapp/cmmc/api/v1beta1"
+	"github.com/cashapp/cmmc/util"
 	"github.com/cashapp/cmmc/util/metrics"
 	//+kubebuilder:scaffold:imports
 )
@@ -114,12 +114,7 @@ var _ = BeforeSuite(func() {
 }, 60)
 
 var _ = Describe("cmmc", func() {
-
 	defer GinkgoRecover()
-
-	BeforeEach(func() {
-		Expect(k8sClient).ToNot(BeNil())
-	})
 
 	const (
 		// timeout is how long we wait for our `Eventually` calls to finish
@@ -134,9 +129,22 @@ var _ = Describe("cmmc", func() {
 	var (
 		rolesMergeSource *cmmcv1beta1.MergeSource
 		usersMergeSource *cmmcv1beta1.MergeSource
+		mergeTarget      *cmmcv1beta1.MergeTarget
 
-		ctx    = context.Background()
-		cmName = types.NamespacedName{Namespace: "default", Name: "test-cm-1"}
+		ctx   = context.Background()
+		names = struct {
+			sourceCM1,
+			targetCM,
+			rolesSource,
+			usersSource,
+			target types.NamespacedName
+		}{
+			sourceCM1:   util.MustNamespacedName("default/test-cm-1", ""),
+			targetCM:    util.MustNamespacedName("default/merge-me", ""),
+			rolesSource: util.MustNamespacedName("default/map-roles-source", ""),
+			usersSource: util.MustNamespacedName("default/map-users-source", ""),
+			target:      util.MustNamespacedName("default/target", ""),
+		}
 
 		// selector is the standard label/selector we are going to be
 		// using for our tests to watch ConfigMaps
@@ -145,109 +153,145 @@ var _ = Describe("cmmc", func() {
 		}
 	)
 
-	It("should create a ConfigMap", func() {
-		cm := &corev1.ConfigMap{
-			TypeMeta:   metav1.TypeMeta{Kind: "ConfigMap"},
-			ObjectMeta: metav1.ObjectMeta{Name: cmName.Name, Namespace: cmName.Namespace, Labels: selector},
-			Data:       map[string]string{"mapRoles": mapRoles1, "mapUsers": mapUsers1},
-		}
-		Expect(k8sClient.Create(ctx, cm)).Should(Succeed())
-	})
+	Context("running the operator", func() {
 
-	When("We create MergeSources", func() {
-		rolesMergeSource = cmmcv1beta1.NewMergeSource("default", "map-roles-source", cmmcv1beta1.MergeSourceSpec{
-			Selector: selector,
-			Source:   cmmcv1beta1.MergeSourceSourceSpec{Data: "mapRoles"},
-			Target:   cmmcv1beta1.MergeSourceTargetSpec{Name: "aws-auth-target", Data: "mapRoles"},
-		})
-		Expect(k8sClient.Create(ctx, rolesMergeSource)).Should(Succeed())
-
-		usersMergeSource = cmmcv1beta1.NewMergeSource("default", "map-users-source", cmmcv1beta1.MergeSourceSpec{
-			Selector: selector,
-			Source:   cmmcv1beta1.MergeSourceSourceSpec{Data: "mapUsers"},
-			Target:   cmmcv1beta1.MergeSourceTargetSpec{Name: "aws-auth-target", Data: "mapUsers"},
-		})
-		Expect(k8sClient.Create(ctx, usersMergeSource)).Should(Succeed())
-
-		It("should annotate the created ConfigMap", func() {
-			Eventually(func() (string, error) {
-				cm := &corev1.ConfigMap{}
-				if err := k8sClient.Get(ctx, cmName, cm); err != nil {
-					return "", err
-				}
-				return cm.GetAnnotations()[watchedByAnnotation], nil
-			}, timeout, interval).Should(Equal("default/aws-auth-map-roles-source,default/aws-auth-map-users-source"))
-		})
-	})
-
-	When("we create a MergeTarget", func() {
-		mergeTargetName := types.NamespacedName{Namespace: "default", Name: "merge-me"}
-		target := cmmcv1beta1.NewMergeTarget("default", "target", cmmcv1beta1.MergeTargetSpec{
-			Target: mergeTargetName.String(),
-			Data: map[string]cmmcv1beta1.MergeTargetDataSpec{
-				"mapRoles": {},
-				"mapUsers": {},
-			},
-		})
-		Expect(k8sClient.Create(ctx, target)).Should(Succeed())
-
-		It("should create a target ConfigMap", func() {
-			Eventually(func() (*configMapState, error) {
-				var cm corev1.ConfigMap
-				if err := k8sClient.Get(ctx, mergeTargetName, &cm); err != nil {
-					return nil, err
-				}
-
-				return initConfigMapState(&cm, managedByMergeTargetAnnotation), nil
-			}, timeout, interval).Should(Equal(expectedConfigMapState(mapRoles1, mapUsers1, "default/target")))
-		})
-	})
-
-	Context("cleanup", func() {
-		When("We remove the roles MergeSource", func() {
-			Expect(rolesMergeSource).Should(Not(BeNil()))
-			Expect(k8sClient.Delete(ctx, rolesMergeSource)).Should(Succeed())
-
-			It("remotes the annotation and mapRoles data", func() {
-				Eventually(func() (*configMapState, error) {
-					cm := &corev1.ConfigMap{}
-					err := k8sClient.Get(ctx, cmName, cm)
-					if err != nil {
-						return nil, errors.WithStack(err)
+		assertConfigMapState := func(name types.NamespacedName, forAnnotation string, s *configMapState) {
+			Eventually(
+				func() (*configMapState, error) {
+					var cm corev1.ConfigMap
+					if err := k8sClient.Get(ctx, name, &cm); err != nil {
+						return nil, err
 					}
-					return initConfigMapState(cm, watchedByAnnotation), nil
-				}, timeout, interval).
-					Should(Equal(expectedConfigMapState("", mapUsers1, "default/aws-auth-map-users-source")))
+					return initConfigMapState(&cm, forAnnotation), nil
+				},
+				timeout,
+				interval,
+			).Should(Equal(s))
+		}
+
+		It("should first have a source ConfigMap", func() {
+			Expect(k8sClient.Create(ctx, &corev1.ConfigMap{
+				TypeMeta:   metav1.TypeMeta{Kind: "ConfigMap"},
+				ObjectMeta: metaFromName(names.sourceCM1, selector),
+				Data:       map[string]string{"mapRoles": mapRoles1, "mapUsers": mapUsers1},
+			})).Should(Succeed())
+		})
+
+		When("creating MergeSource", func() {
+			It("can create a MergeSource for users", func() {
+				rolesMergeSource = cmmcv1beta1.NewMergeSource(names.rolesSource, cmmcv1beta1.MergeSourceSpec{
+					Selector: selector,
+					Source:   cmmcv1beta1.MergeSourceSourceSpec{Data: "mapRoles"},
+					Target:   cmmcv1beta1.MergeSourceTargetSpec{Name: names.target.String(), Data: "mapRoles"},
+				})
+				Expect(k8sClient.Create(ctx, rolesMergeSource)).Should(Succeed())
+			})
+
+			It("can create a MergeSource for roles", func() {
+				usersMergeSource = cmmcv1beta1.NewMergeSource(names.usersSource, cmmcv1beta1.MergeSourceSpec{
+					Selector: selector,
+					Source:   cmmcv1beta1.MergeSourceSourceSpec{Data: "mapUsers"},
+					Target:   cmmcv1beta1.MergeSourceTargetSpec{Name: names.target.String(), Data: "mapUsers"},
+				})
+				Expect(k8sClient.Create(ctx, usersMergeSource)).Should(Succeed())
+			})
+
+			It("should annotate the source ConfigMap", func() {
+				assertConfigMapState(names.sourceCM1, watchedByAnnotation, &configMapState{
+					MapRoles:   mapUsers1,
+					MapUsers:   mapRoles1,
+					Annotation: "default/map-roles-source,default/map-users-source",
+				})
 			})
 		})
-	})
 
-	It("cleans up annotations and data when we remove the source", func() {
+		When("creating a MergeTarget", func() {
+			It("can successfuly create a MergeTarget", func() {
+				mergeTarget = cmmcv1beta1.NewMergeTarget(names.target, cmmcv1beta1.MergeTargetSpec{
+					Target: names.targetCM.String(),
+					Data:   map[string]cmmcv1beta1.MergeTargetDataSpec{"mapRoles": {}, "mapUsers": {}},
+				})
+				Expect(k8sClient.Create(ctx, mergeTarget)).Should(Succeed())
+			})
 
-		// delete the second source
-		Expect(usersMergeSource).Should(Not(BeNil()))
-		Expect(k8sClient.Delete(ctx, usersMergeSource)).Should(Succeed())
+			It("should create a target ConfigMap based on the MergeTarget", func() {
+				assertConfigMapState(names.targetCM, managedByMergeTargetAnnotation, &configMapState{
+					MapRoles:   mapRoles1,
+					MapUsers:   mapUsers1,
+					Annotation: names.target.String(),
+				})
+			})
+		})
 
-		Eventually(func() (bool, error) {
-			cm := &corev1.ConfigMap{}
-			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: "default", Name: "test-cm1"}, cm)
-			if err != nil {
-				return false, errors.WithStack(err)
-			}
+		Context("cleanup", func() {
+			When("removing roles MergeSource", func() {
+				It("can be deleted", func() {
+					Expect(rolesMergeSource).Should(Not(BeNil()))
+					Expect(k8sClient.Delete(ctx, rolesMergeSource)).Should(Succeed())
+				})
 
-			return cm.GetAnnotations()[watchedByAnnotation] == "", nil
-		}, timeout, interval).Should(BeTrue())
+				It("removes the annotation for roles source", func() {
+					assertConfigMapState(names.sourceCM1, watchedByAnnotation, &configMapState{
+						MapRoles:   mapRoles1,
+						MapUsers:   mapUsers1,
+						Annotation: names.usersSource.String(),
+					})
+				})
 
-		Eventually(func() bool {
-			cm := &corev1.ConfigMap{}
-			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: "default", Name: "aws-auth"}, cm)
-			if err != nil {
-				return false
-			}
+				It("removes the roles from the target", func() {
+					assertConfigMapState(names.targetCM, managedByMergeTargetAnnotation, &configMapState{
+						MapRoles:   "",
+						MapUsers:   mapUsers1,
+						Annotation: names.target.String(),
+					})
+				})
+			})
 
-			Expect(cm.Data["mapUsers"]).Should(Equal(""))
-			return true
-		}).Should(BeTrue())
+			When("removing users MergeSource", func() {
+				It("can be deleted", func() {
+					Expect(usersMergeSource).Should(Not(BeNil()))
+					Expect(k8sClient.Delete(ctx, usersMergeSource)).Should(Succeed())
+				})
+
+				It("removes the annotation for users source", func() {
+					assertConfigMapState(names.sourceCM1, watchedByAnnotation, &configMapState{
+						MapRoles:   mapRoles1,
+						MapUsers:   mapUsers1,
+						Annotation: "",
+					})
+				})
+
+				It("removes the users from the target", func() {
+					assertConfigMapState(names.targetCM, managedByMergeTargetAnnotation, &configMapState{
+						MapRoles:   "",
+						MapUsers:   "",
+						Annotation: names.target.String(),
+					})
+				})
+			})
+
+			When("removing the MergeTarget", func() {
+				It("it can be deleted", func() {
+					Expect(mergeTarget).Should(Not(BeNil()))
+					Expect(k8sClient.Delete(ctx, mergeTarget)).Should(Succeed())
+				})
+
+				It("removes the target", func() {
+					Eventually(
+						func() (bool, error) {
+							var cm corev1.ConfigMap
+							err := k8sClient.Get(ctx, names.targetCM, &cm)
+							if k8serrors.IsNotFound(err) {
+								return true, nil
+							}
+							return false, err
+						},
+						timeout,
+						interval,
+					).Should(BeTrue())
+				})
+			})
+		})
 	})
 })
 
@@ -288,4 +332,8 @@ func expectedConfigMapState(roles, users, annotation string) *configMapState {
 		MapUsers:   users,
 		Annotation: annotation,
 	}
+}
+
+func metaFromName(n types.NamespacedName, labels map[string]string) metav1.ObjectMeta {
+	return metav1.ObjectMeta{Namespace: n.Namespace, Name: n.Name, Labels: labels}
 }
