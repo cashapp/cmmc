@@ -212,6 +212,20 @@ func (m *MergeTarget) ReduceDataState(
 	return updatedKeys, fieldsErrors
 }
 
+func NewMergeTarget(name types.NamespacedName, spec MergeTargetSpec) *MergeTarget {
+	return &MergeTarget{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: GroupVersion.String(),
+			Kind:       "MergeTarget",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name.Name,
+			Namespace: name.Namespace,
+		},
+		Spec: spec,
+	}
+}
+
 //+kubebuilder:object:root=true
 
 // MergeTargetList contains a list of MergeTarget.

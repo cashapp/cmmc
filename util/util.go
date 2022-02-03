@@ -43,3 +43,12 @@ func NamespacedName(name, namespace string) (types.NamespacedName, error) {
 		Name:      name,
 	}, nil
 }
+
+func MustNamespacedName(name, namespace string) types.NamespacedName {
+	n, err := NamespacedName(name, namespace)
+	if err != nil {
+		panic(err)
+	}
+
+	return n
+}
