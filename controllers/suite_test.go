@@ -234,11 +234,9 @@ var _ = Describe("cmmc", func() {
 				})
 
 				It("removes the annotation for roles source", func() {
-					assertConfigMapState(names.sourceCM1, watchedByAnnotation, Equal(&configMapState{
-						MapRoles:   mapRoles1,
-						MapUsers:   mapUsers1,
-						Annotation: names.usersSource.String(),
-					}))
+					assertConfigMapState(names.sourceCM1, watchedByAnnotation, HaveAnnotation(
+						names.usersSource.String(),
+					))
 				})
 
 				It("removes the roles from the target", func() {
@@ -257,11 +255,7 @@ var _ = Describe("cmmc", func() {
 				})
 
 				It("removes the annotation for users source", func() {
-					assertConfigMapState(names.sourceCM1, watchedByAnnotation, Equal(&configMapState{
-						MapRoles:   mapRoles1,
-						MapUsers:   mapUsers1,
-						Annotation: "",
-					}))
+					assertConfigMapState(names.sourceCM1, watchedByAnnotation, HaveAnnotation(""))
 				})
 
 				It("removes the users from the target", func() {
@@ -304,17 +298,6 @@ var _ = AfterSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 })
 
-const mapRoles1 = `
-- rolearn: friend
-  username: test1
-  groups: [ group1, group2 ]
-`
-const mapUsers1 = `
-- rolearn: friend
-  username: test1
-  groups: [ group1, group2 ]
-`
-
 type configMapState struct {
 	MapRoles   string
 	MapUsers   string
@@ -328,3 +311,14 @@ func HaveAnnotation(value string) gtypes.GomegaMatcher {
 func metaFromName(n types.NamespacedName, labels map[string]string) metav1.ObjectMeta {
 	return metav1.ObjectMeta{Namespace: n.Namespace, Name: n.Name, Labels: labels}
 }
+
+const mapRoles1 = `
+- rolearn: friend
+  username: test1
+  groups: [ group1, group2 ]
+`
+const mapUsers1 = `
+- rolearn: friend
+  username: test1
+  groups: [ group1, group2 ]
+`
