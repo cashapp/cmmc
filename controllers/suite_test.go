@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -165,10 +167,12 @@ var _ = Describe("cmmc", func() {
 						return nil, err
 					}
 					anns := cm.GetAnnotations()
+					watchedBy := strings.Split(anns[watchedByAnnotation], ",")
+					sort.Strings(watchedBy)
 					return &configMapState{
 						MapRoles:            cm.Data["mapRoles"],
 						MapUsers:            cm.Data["mapUsers"],
-						WatchedByAnnotation: anns[watchedByAnnotation],
+						WatchedByAnnotation: watchedBy,
 						ManagedByAnnotation: anns[managedByMergeTargetAnnotation],
 					}, nil
 				},
@@ -304,8 +308,8 @@ var _ = AfterSuite(func() {
 type configMapState struct {
 	MapRoles            string
 	MapUsers            string
-	WatchedByAnnotation string
 	ManagedByAnnotation string
+	WatchedByAnnotation []string
 }
 
 type ManagedByAnnotation string
@@ -320,7 +324,12 @@ func HaveConfigMapState(params ...interface{}) gtypes.GomegaMatcher {
 		case ManagedByAnnotation:
 			matchers = append(matchers, HaveField("ManagedByAnnotation", Equal(string(v))))
 		case WatchedByAnnotation:
-			matchers = append(matchers, HaveField("WatchedByAnnotation", Equal(string(v))))
+			// the order of the watched by annotation is suspect!
+			// we want to have the _set_ of the annotation be valid
+			// not necessarily the order.
+			ss := strings.Split(string(v), ",")
+			sort.Strings(ss)
+			matchers = append(matchers, HaveField("WatchedByAnnotation", Equal(ss)))
 		case MapRoles:
 			matchers = append(matchers, HaveField("MapRoles", Equal(string(v))))
 		case MapUsers:
