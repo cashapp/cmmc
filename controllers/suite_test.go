@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
@@ -156,22 +157,24 @@ var _ = Describe("cmmc", func() {
 
 	Context("running the operator", func() {
 
-		assertConfigMapState := func(name types.NamespacedName, forAnnotation string, match gtypes.GomegaMatcher) {
+		assertConfigMapState := func(name types.NamespacedName, ms ...interface{}) {
 			Eventually(
 				func() (*configMapState, error) {
 					var cm corev1.ConfigMap
 					if err := k8sClient.Get(ctx, name, &cm); err != nil {
 						return nil, err
 					}
+					anns := cm.GetAnnotations()
 					return &configMapState{
-						MapRoles:   cm.Data["mapRoles"],
-						MapUsers:   cm.Data["mapUsers"],
-						Annotation: cm.GetAnnotations()[forAnnotation],
+						MapRoles:            cm.Data["mapRoles"],
+						MapUsers:            cm.Data["mapUsers"],
+						WatchedByAnnotation: anns[watchedByAnnotation],
+						ManagedByAnnotation: anns[managedByMergeTargetAnnotation],
 					}, nil
 				},
 				timeout,
 				interval,
-			).Should(match)
+			).Should(HaveConfigMapState(ms...))
 		}
 
 		It("should first have a source ConfigMap", func() {
@@ -202,9 +205,10 @@ var _ = Describe("cmmc", func() {
 			})
 
 			It("should annotate the source ConfigMap", func() {
-				assertConfigMapState(names.sourceCM1, watchedByAnnotation, HaveAnnotation(
-					"default/map-roles-source,default/map-users-source",
-				))
+				assertConfigMapState(
+					names.sourceCM1,
+					WatchedByAnnotation("default/map-roles-source,default/map-users-source"),
+				)
 			})
 		})
 
@@ -218,11 +222,12 @@ var _ = Describe("cmmc", func() {
 			})
 
 			It("should create a target ConfigMap based on the MergeTarget", func() {
-				assertConfigMapState(names.targetCM, managedByMergeTargetAnnotation, Equal(&configMapState{
-					MapRoles:   mapRoles1,
-					MapUsers:   mapUsers1,
-					Annotation: names.target.String(),
-				}))
+				assertConfigMapState(
+					names.targetCM,
+					MapRoles(mapRoles1),
+					MapUsers(mapUsers1),
+					ManagedByAnnotation(names.target.String()),
+				)
 			})
 		})
 
@@ -234,17 +239,15 @@ var _ = Describe("cmmc", func() {
 				})
 
 				It("removes the annotation for roles source", func() {
-					assertConfigMapState(names.sourceCM1, watchedByAnnotation, HaveAnnotation(
-						names.usersSource.String(),
-					))
+					assertConfigMapState(names.sourceCM1, WatchedByAnnotation(names.usersSource.String()))
 				})
 
 				It("removes the roles from the target", func() {
-					assertConfigMapState(names.targetCM, managedByMergeTargetAnnotation, Equal(&configMapState{
-						MapRoles:   "",
-						MapUsers:   mapUsers1,
-						Annotation: names.target.String(),
-					}))
+					assertConfigMapState(names.targetCM,
+						ManagedByAnnotation(names.target.String()),
+						MapRoles(""),
+						MapUsers(mapUsers1),
+					)
 				})
 			})
 
@@ -255,15 +258,15 @@ var _ = Describe("cmmc", func() {
 				})
 
 				It("removes the annotation for users source", func() {
-					assertConfigMapState(names.sourceCM1, watchedByAnnotation, HaveAnnotation(""))
+					assertConfigMapState(names.sourceCM1, WatchedByAnnotation(""))
 				})
 
 				It("removes the users from the target", func() {
-					assertConfigMapState(names.targetCM, managedByMergeTargetAnnotation, Equal(&configMapState{
-						MapRoles:   "",
-						MapUsers:   "",
-						Annotation: names.target.String(),
-					}))
+					assertConfigMapState(names.targetCM,
+						ManagedByAnnotation(names.target.String()),
+						MapUsers(""),
+						MapRoles(""),
+					)
 				})
 			})
 
@@ -299,13 +302,35 @@ var _ = AfterSuite(func() {
 })
 
 type configMapState struct {
-	MapRoles   string
-	MapUsers   string
-	Annotation string
+	MapRoles            string
+	MapUsers            string
+	WatchedByAnnotation string
+	ManagedByAnnotation string
 }
 
-func HaveAnnotation(value string) gtypes.GomegaMatcher {
-	return HaveField("Annotation", Equal(value))
+type ManagedByAnnotation string
+type WatchedByAnnotation string
+type MapRoles string
+type MapUsers string
+
+func HaveConfigMapState(params ...interface{}) gtypes.GomegaMatcher {
+	matchers := []gtypes.GomegaMatcher{}
+	for _, p := range params {
+		switch v := p.(type) {
+		case ManagedByAnnotation:
+			matchers = append(matchers, HaveField("ManagedByAnnotation", Equal(string(v))))
+		case WatchedByAnnotation:
+			matchers = append(matchers, HaveField("WatchedByAnnotation", Equal(string(v))))
+		case MapRoles:
+			matchers = append(matchers, HaveField("MapRoles", Equal(string(v))))
+		case MapUsers:
+			matchers = append(matchers, HaveField("MapUsers", Equal(string(v))))
+		default:
+			Fail(fmt.Sprintf("Unknown type %T in HaveConfigMapState() \n", v))
+		}
+	}
+
+	return And(matchers...)
 }
 
 func metaFromName(n types.NamespacedName, labels map[string]string) metav1.ObjectMeta {
