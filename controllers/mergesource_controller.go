@@ -220,7 +220,6 @@ func (r *MergeSourceReconciler) sources(ctx context.Context, s *cmmcv1beta1.Merg
 
 	n := 0
 	for _, cm := range sources.Items {
-		log.FromContext(ctx).Info("found a thing in a loop", "ns-", cm.GetNamespace())
 		_, ok := nsMap[cm.GetNamespace()]
 		if ok {
 			sources.Items[n] = cm

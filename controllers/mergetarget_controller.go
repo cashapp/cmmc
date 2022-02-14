@@ -351,7 +351,7 @@ func (r *MergeTargetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				}
 			})).
 			Watches(&source.Kind{Type: &cmmcv1beta1.MergeSource{}}, handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
-				source, ok := o.(*cmmcv1beta1.MergeSource) //
+				source, ok := o.(*cmmcv1beta1.MergeSource)
 				if !ok {
 					return nil
 				}
