@@ -4,11 +4,52 @@ import (
 	"context"
 	"strings"
 
+	"github.com/cashapp/cmmc/util"
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const listSep = ","
+
+type Annotation string
+
+func (a Annotation) String() string {
+	return string(a)
+}
+
+func (a Annotation) RemoveFromList(val string) UpdateFn {
+	return RemoveFromList(string(a), val)
+}
+
+func (a Annotation) AddToList(val string) UpdateFn {
+	return AddToList(string(a), val)
+}
+
+func (a Annotation) Add(val string) UpdateFn {
+	return AddToList(string(a), val)
+}
+
+func (a Annotation) Remove() UpdateFn {
+	return Remove(string(a))
+}
+
+func (a Annotation) ParseObjectName(o client.Object) (types.NamespacedName, bool) {
+	n, ok := o.GetAnnotations()[string(a)]
+	if !ok {
+		return types.NamespacedName{}, false
+	}
+
+	// N.B. This should be fully qualified so we don't specify the
+	// namespace of the current resource as a default for NamespacedName.
+	namespacedName, err := util.NamespacedName(n, "")
+	if err != nil {
+		return types.NamespacedName{}, false
+	}
+
+	return namespacedName, true
+
+}
 
 // UpdateFn is any function that mutates a string map.
 type UpdateFn func(in map[string]string)

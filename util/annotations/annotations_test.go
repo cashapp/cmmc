@@ -20,6 +20,24 @@ func TestAddToList(t *testing.T) {
 		AddToList("foo", "bar"), // add dupliacte (noop)
 		AddToList("foo", ""),    //noop
 	)
+
+	var (
+		foo = Annotation("foo")
+		hey = Annotation("hey")
+	)
+	assertUpdated(
+		t,
+		map[string]string{},
+		map[string]string{
+			"foo": "bar,baz",
+			"hey": "you",
+		},
+		foo.AddToList("bar"),
+		foo.AddToList("baz"),
+		hey.AddToList("you"),
+		foo.AddToList("bar"),
+		foo.AddToList(""),
+	)
 }
 
 func TestRemoveFromList(t *testing.T) {

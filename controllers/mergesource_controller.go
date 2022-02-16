@@ -27,9 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	cmmcv1beta1 "github.com/cashapp/cmmc/api/v1beta1"
@@ -96,9 +94,7 @@ func (r *MergeSourceReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 }
 
 func (r *MergeSourceReconciler) reconcileMergeSource(
-	ctx context.Context,
-	mergeSource *MergeSource,
-	watched *watchedConfigMap,
+	ctx context.Context, mergeSource *MergeSource, watched *watchedConfigMap,
 ) (bool, error) {
 	if mergeSource == nil {
 		return false, nil
@@ -154,7 +150,9 @@ func (r *MergeSourceReconciler) reconcileMergeSource(
 	return false, nil
 }
 
-func (r *MergeSourceReconciler) finalizeDeletion(ctx context.Context, s *MergeSource, w *watchedConfigMap) error {
+func (r *MergeSourceReconciler) finalizeDeletion(
+	ctx context.Context, s *MergeSource, w *watchedConfigMap,
+) error {
 	sources, err := r.sources(ctx, s)
 	if err != nil {
 		return err
@@ -230,8 +228,12 @@ func (r *MergeSourceReconciler) sources(ctx context.Context, s *cmmcv1beta1.Merg
 	return sources.Items[:n], nil
 }
 
-func (r *MergeSourceReconciler) configMapOutput(ctx context.Context, cm corev1.ConfigMap, key string, w *watchedConfigMap) (string, error) {
-	if w.Name == resourceName(&cm) {
+func (r *MergeSourceReconciler) configMapOutput(
+	ctx context.Context, cm corev1.ConfigMap,
+	key string,
+	w *watchedConfigMap,
+) (string, error) {
+	if w.Name == util.ObjectResourceName(&cm) {
 		w.ShouldBeRemoved = false
 	}
 
@@ -246,12 +248,16 @@ func (r *MergeSourceReconciler) configMapOutput(ctx context.Context, cm corev1.C
 
 // Delete the annotation if there is no merge source watching the configmap
 // Otherwise, remove the mergesource from the annotations
-func (r *MergeSourceReconciler) cleanUpWatchedByAnnotation(ctx context.Context, cm *corev1.ConfigMap, name string) error {
-	return errors.WithStack(anns.Apply(ctx, r.Client, cm, anns.RemoveFromList(watchedByAnnotation, name)))
+func (r *MergeSourceReconciler) cleanUpWatchedByAnnotation(
+	ctx context.Context, cm *corev1.ConfigMap, name string,
+) error {
+	return errors.WithStack(anns.Apply(ctx, r.Client, cm, watchedBy.RemoveFromList(name)))
 }
 
-func (r *MergeSourceReconciler) annotateWatchedByConfigMap(ctx context.Context, cm *corev1.ConfigMap, name string) error {
-	return errors.WithStack(anns.Apply(ctx, r.Client, cm, anns.AddToList(watchedByAnnotation, name)))
+func (r *MergeSourceReconciler) annotateWatchedByConfigMap(
+	ctx context.Context, cm *corev1.ConfigMap, name string,
+) error {
+	return errors.WithStack(anns.Apply(ctx, r.Client, cm, watchedBy.AddToList(name)))
 }
 
 type watchedConfigMap struct {
@@ -261,7 +267,9 @@ type watchedConfigMap struct {
 	WatchedBy       types.NamespacedName
 }
 
-func (r *MergeSourceReconciler) watchedConfigMap(ctx context.Context, name types.NamespacedName) *watchedConfigMap {
+func (r *MergeSourceReconciler) watchedConfigMap(
+	ctx context.Context, name types.NamespacedName,
+) *watchedConfigMap {
 	var cm corev1.ConfigMap
 	if err := r.Get(ctx, name, &cm); err != nil {
 		// If we didn't find a configMap, we have nothing to remove, and we
@@ -271,7 +279,7 @@ func (r *MergeSourceReconciler) watchedConfigMap(ctx context.Context, name types
 
 	// if it's not being watched by anything, we can abort here
 	// since we found an irrelevant configMap
-	n, ok := objectWatchedBy(&cm)
+	n, ok := watchedBy.ParseObjectName(&cm)
 	if !ok {
 		return nil
 	}
@@ -279,12 +287,14 @@ func (r *MergeSourceReconciler) watchedConfigMap(ctx context.Context, name types
 	return &watchedConfigMap{
 		ShouldBeRemoved: true, // assume we should be removing it unless proven otherwise
 		Resource:        cm,
-		Name:            resourceName(&cm),
+		Name:            util.ObjectResourceName(&cm),
 		WatchedBy:       n,
 	}
 }
 
-func (r *MergeSourceReconciler) maybeRemoveWatchedAnnotation(ctx context.Context, w *watchedConfigMap) error {
+func (r *MergeSourceReconciler) maybeRemoveWatchedAnnotation(
+	ctx context.Context, w *watchedConfigMap,
+) error {
 	if !w.ShouldBeRemoved {
 		return nil
 	}
@@ -304,44 +314,15 @@ func (r *MergeSourceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return errors.WithStack(
 		ctrl.NewControllerManagedBy(mgr).
 			For(&cmmcv1beta1.MergeSource{}).
-			Watches(&source.Kind{Type: &corev1.ConfigMap{}}, handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
-				watchedBy, ok := objectWatchedBy(o)
-				if ok {
-					return []reconcile.Request{
-						{
-							NamespacedName: watchedBy,
-						},
-						{
-							NamespacedName: types.NamespacedName{
-								Namespace: o.GetNamespace(),
-								Name:      o.GetName(),
-							},
-						},
-					}
-				}
-
-				return nil
-			})).
-			Complete(r),
+			Watches(
+				&source.Kind{Type: &corev1.ConfigMap{}},
+				watchReconciliationEventHandler(
+					watchedBy.ParseObjectName,
+					func(o client.Object) (types.NamespacedName, bool) {
+						n := util.ObjectNamespacedName(o)
+						return n, true
+					},
+				),
+			).Complete(r),
 	)
-}
-
-func objectWatchedBy(o client.Object) (types.NamespacedName, bool) {
-	managed, ok := o.GetAnnotations()[watchedByAnnotation]
-	if !ok {
-		return types.NamespacedName{}, false
-	}
-
-	// N.B. This should be fully qualified so we don't specify the
-	// namespace of the current resource as a default for NamespacedName.
-	namespacedName, err := util.NamespacedName(managed, "")
-	if err != nil {
-		return types.NamespacedName{}, false
-	}
-
-	return namespacedName, true
-}
-
-func resourceName(o client.Object) string {
-	return o.GetNamespace() + "/" + o.GetName()
 }

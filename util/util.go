@@ -5,6 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var (
@@ -38,12 +39,10 @@ func NamespacedName(name, namespace string) (types.NamespacedName, error) {
 		return types.NamespacedName{}, errors.Wrapf(errInvalidName, "%s is invalid", name)
 	}
 
-	return types.NamespacedName{
-		Namespace: namespace,
-		Name:      name,
-	}, nil
+	return types.NamespacedName{Namespace: namespace, Name: name}, nil
 }
 
+// MustNamespacedName panics if it can't construct a types.NamespacedName.
 func MustNamespacedName(name, namespace string) types.NamespacedName {
 	n, err := NamespacedName(name, namespace)
 	if err != nil {
@@ -51,4 +50,17 @@ func MustNamespacedName(name, namespace string) types.NamespacedName {
 	}
 
 	return n
+}
+
+// ObjectNamespacedName gets the types.NamespacedName from the k8s object.
+func ObjectNamespacedName(o client.Object) types.NamespacedName {
+	return types.NamespacedName{
+		Namespace: o.GetNamespace(),
+		Name:      o.GetName(),
+	}
+}
+
+// ObjectResourceName gets string representation of the k8s name.
+func ObjectResourceName(o client.Object) string {
+	return ObjectNamespacedName(o).String()
 }

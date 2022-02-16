@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cashapp/cmmc/util"
 	"github.com/pkg/errors"
@@ -105,6 +106,20 @@ func NewMergeSource(n types.NamespacedName, spec MergeSourceSpec) *MergeSource {
 		ObjectMeta: metav1.ObjectMeta{Name: n.Name, Namespace: n.Namespace},
 		Spec:       spec,
 	}
+}
+
+func MergeSourceNamespacedTargetName(o client.Object) (types.NamespacedName, bool) {
+	source, ok := o.(*MergeSource)
+	if !ok {
+		return types.NamespacedName{}, false
+	}
+
+	n, err := source.NamespacedTargetName()
+	if err != nil {
+		return n, false
+	}
+
+	return n, true
 }
 
 //+kubebuilder:object:root=true
