@@ -27,16 +27,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 
 	cmmcv1beta1 "github.com/cashapp/cmmc/api/v1beta1"
-	"github.com/cashapp/cmmc/util"
 	anns "github.com/cashapp/cmmc/util/annotations"
 	"github.com/cashapp/cmmc/util/finalizer"
 	"github.com/cashapp/cmmc/util/metrics"
@@ -246,21 +243,25 @@ func (r *MergeTargetReconciler) targetConfigMap(
 
 var errMisconfiguredTargetConfigMap = errors.New("misconfigured target ConfigMap")
 
-func (r *MergeTargetReconciler) ensureManagedByAnnotation(ctx context.Context, cm *corev1.ConfigMap, managedByName string) (bool, error) {
-	managedBy, exists := cm.GetAnnotations()[managedByMergeTargetAnnotation]
+func (r *MergeTargetReconciler) ensureManagedByAnnotation(
+	ctx context.Context, cm *corev1.ConfigMap, managedByName string,
+) (bool, error) {
+	managedBy, exists := managedByMergeTarget.ParseObjectName(cm)
 	if !exists {
-		err := anns.Apply(ctx, r.Client, cm, anns.Add(managedByMergeTargetAnnotation, managedByName))
+		err := anns.Apply(ctx, r.Client, cm, managedByMergeTarget.Add(managedByName))
 		return true, errors.WithStack(err)
 	}
 
-	if managedBy != managedByName {
+	if managedBy.String() != managedByName {
 		return false, fmt.Errorf("cm managed by %s: %w", managedBy, errMisconfiguredTargetConfigMap)
 	}
 
 	return false, nil
 }
 
-func (r *MergeTargetReconciler) maybeSetNewlyCreated(ctx context.Context, t *MergeTarget, to string) error {
+func (r *MergeTargetReconciler) maybeSetNewlyCreated(
+	ctx context.Context, t *MergeTarget, to string,
+) error {
 	if t.Status.NewlyCreated != "" {
 		return nil
 	}
@@ -269,7 +270,9 @@ func (r *MergeTargetReconciler) maybeSetNewlyCreated(ctx context.Context, t *Mer
 	return errors.WithStack(r.Status().Update(ctx, t))
 }
 
-func (r *MergeTargetReconciler) finalizeDeletion(ctx context.Context, name types.NamespacedName, t *MergeTarget) error {
+func (r *MergeTargetReconciler) finalizeDeletion(
+	ctx context.Context, name types.NamespacedName, t *MergeTarget,
+) error {
 	var cm corev1.ConfigMap
 	if err := r.Get(ctx, name, &cm); err != nil {
 		// if the CM doesn't exist we are probably done
@@ -295,7 +298,7 @@ func (r *MergeTargetReconciler) finalizeDeletion(ctx context.Context, name types
 	}
 
 	// remove the annotation
-	anns.Set(&cm, anns.Remove(managedByMergeTargetAnnotation))
+	anns.Set(&cm, managedByMergeTarget.Remove())
 
 	// perform the udpate
 	return errors.Wrapf(r.Update(ctx, &cm), "error reverting fields of target configMap %s", name)
@@ -305,66 +308,34 @@ const (
 	fieldIndexStatusTarget = "status.target"
 )
 
+func resourceStatusTargetIndexer(o client.Object) []string {
+	target, ok := cmmcv1beta1.MergeSourceNamespacedTargetName(o)
+	if !ok {
+		return nil
+	}
+	return []string{target.String()}
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *MergeTargetReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	ctx := context.Background()
 	if err := mgr.GetFieldIndexer().IndexField(
-		context.Background(),
-		&cmmcv1beta1.MergeSource{},
-		fieldIndexStatusTarget,
-		func(o client.Object) []string {
-			source, ok := o.(*cmmcv1beta1.MergeSource)
-			if !ok {
-				return nil
-			}
-			target, err := source.NamespacedTargetName()
-			if err != nil {
-				return nil
-			}
-			return []string{target.String()}
-		},
+		ctx, &cmmcv1beta1.MergeSource{}, fieldIndexStatusTarget, resourceStatusTargetIndexer,
 	); err != nil {
-		return errors.Wrapf(
-			err,
-			"error setting field indexer for field = %s",
-			fieldIndexStatusTarget,
-		)
+		return errors.Wrapf(err, "error setting field indexer for field = %s", fieldIndexStatusTarget)
 	}
 
 	return errors.WithStack(
 		ctrl.NewControllerManagedBy(mgr).
 			For(&cmmcv1beta1.MergeTarget{}).
-			Watches(&source.Kind{Type: &corev1.ConfigMap{}}, handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
-				mergeTargetName, ok := o.GetAnnotations()[managedByMergeTargetAnnotation]
-				if !ok {
-					return nil
-				}
-
-				name, err := util.NamespacedName(mergeTargetName, "")
-				if err != nil {
-					return nil
-				}
-
-				return []reconcile.Request{
-					{
-						NamespacedName: name,
-					},
-				}
-			})).
-			Watches(&source.Kind{Type: &cmmcv1beta1.MergeSource{}}, handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
-				source, ok := o.(*cmmcv1beta1.MergeSource)
-				if !ok {
-					return nil
-				}
-				target, err := source.NamespacedTargetName()
-				if err != nil {
-					log.Log.WithName("enqueuer").Error(err, "failed to enqueue")
-					return nil
-				}
-
-				return []reconcile.Request{
-					{NamespacedName: target},
-				}
-			})).
+			Watches(
+				&source.Kind{Type: &corev1.ConfigMap{}},
+				watchReconciliationEventHandler(managedByMergeTarget.ParseObjectName),
+			).
+			Watches(
+				&source.Kind{Type: &cmmcv1beta1.MergeSource{}},
+				watchReconciliationEventHandler(cmmcv1beta1.MergeSourceNamespacedTargetName),
+			).
 			Complete(r),
 	)
 }

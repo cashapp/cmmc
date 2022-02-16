@@ -167,13 +167,13 @@ var _ = Describe("cmmc", func() {
 						return nil, err
 					}
 					anns := cm.GetAnnotations()
-					watchedBy := strings.Split(anns[watchedByAnnotation], ",")
+					watchedBy := strings.Split(anns[string(watchedBy)], ",")
 					sort.Strings(watchedBy)
 					return &configMapState{
 						MapRoles:            cm.Data["mapRoles"],
 						MapUsers:            cm.Data["mapUsers"],
 						WatchedByAnnotation: watchedBy,
-						ManagedByAnnotation: anns[managedByMergeTargetAnnotation],
+						ManagedByAnnotation: anns[string(managedByMergeTarget)],
 					}, nil
 				},
 				timeout,
