@@ -56,7 +56,7 @@ type MergeSourceSpec struct {
 	// (if any) for this to become a valid source.
 	//
 	// If omitted, will allow ConfigMaps from all namespaces.
-	NamespaceSelector map[string]string `json:"namespace_selector,omitempty"`
+	NamespaceSelector map[string]string `json:"namespace_selector,omitempty"` //nolint:tagliatelle
 
 	// Source describes which data key from the source ConfigMap we will be observing/merging.
 	Source MergeSourceSourceSpec `json:"source,omitempty"`

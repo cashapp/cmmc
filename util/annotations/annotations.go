@@ -12,28 +12,38 @@ import (
 
 const listSep = ","
 
+// Annotation is a string type that can be used as a
+// convenience wrapper for the exported functions of this
+// package.
 type Annotation string
 
+// String returns the annotation name.
 func (a Annotation) String() string {
 	return string(a)
 }
 
+// RemoveFromList removes the value from the list.
 func (a Annotation) RemoveFromList(val string) UpdateFn {
 	return RemoveFromList(string(a), val)
 }
 
+// AddToList adds the value to the annotation list.
 func (a Annotation) AddToList(val string) UpdateFn {
 	return AddToList(string(a), val)
 }
 
+// Add adds/sets a single value annotation.
 func (a Annotation) Add(val string) UpdateFn {
 	return AddToList(string(a), val)
 }
 
+// Remove removes the annotation.
 func (a Annotation) Remove() UpdateFn {
 	return Remove(string(a))
 }
 
+// ParseObjectName attempts to parse an object name from an annotation
+// on the given object.
 func (a Annotation) ParseObjectName(o client.Object) (types.NamespacedName, bool) {
 	n, ok := o.GetAnnotations()[string(a)]
 	if !ok {
@@ -48,7 +58,6 @@ func (a Annotation) ParseObjectName(o client.Object) (types.NamespacedName, bool
 	}
 
 	return namespacedName, true
-
 }
 
 // UpdateFn is any function that mutates a string map.
@@ -69,6 +78,7 @@ func AddToList(k, v string) UpdateFn {
 		if v == "" {
 			return
 		}
+
 		current, ok := in[k]
 		if !ok || current == "" {
 			in[k] = v

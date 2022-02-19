@@ -1,8 +1,9 @@
-package annotations
+package annotations_test
 
 import (
 	"testing"
 
+	. "github.com/cashapp/cmmc/util/annotations"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -18,13 +19,14 @@ func TestAddToList(t *testing.T) {
 		AddToList("foo", "baz"), // add foo=baz (bar,baz)
 		AddToList("hey", "you"), // add new key
 		AddToList("foo", "bar"), // add dupliacte (noop)
-		AddToList("foo", ""),    //noop
+		AddToList("foo", ""),    // noop
 	)
 
 	var (
 		foo = Annotation("foo")
 		hey = Annotation("hey")
 	)
+
 	assertUpdated(
 		t,
 		map[string]string{},
@@ -61,8 +63,10 @@ func TestRemoveFromList(t *testing.T) {
 
 func assertUpdated(t *testing.T, in, expected map[string]string, fns ...UpdateFn) {
 	t.Helper()
+
 	for _, f := range fns {
 		f(in)
 	}
+
 	assert.Equal(t, expected, in)
 }

@@ -1,7 +1,9 @@
-package validator
+package validator_test
 
 import (
 	"testing"
+
+	"github.com/cashapp/cmmc/util/validator"
 )
 
 const awsAuthMapRolesSchema = `{
@@ -33,19 +35,19 @@ const awsAuthMapRolesSchema = `{
 }`
 
 func TestValidatorBasic(t *testing.T) {
-	err := Validate(`{"type":"string"}`, "hi")
+	err := validator.Validate(`{"type":"string"}`, "hi")
 	if err != nil {
 		t.Errorf("unexpected failure %s", err)
 	}
 
-	err = Validate(`{"type"nana"}`, "hi")
+	err = validator.Validate(`{"type"nana"}`, "hi")
 	if err == nil {
 		t.Error("expected failure but succeeded")
 	}
 }
 
 func TestValidateAWSAuth(t *testing.T) {
-	if err := Validate(awsAuthMapRolesSchema, `
+	if err := validator.Validate(awsAuthMapRolesSchema, `
 - rolearn: banana
   username: banana
   groups:

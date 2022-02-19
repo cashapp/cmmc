@@ -1,0 +1,20 @@
+run:
+  timeout: 2m
+linters:
+  enable-all: true
+  disable:
+  - exhaustivestruct
+  - gci
+  - gochecknoglobals
+  - gochecknoinits
+  - golint
+  - interfacer
+  - ireturn
+  - lll
+  - maligned
+  - nlreturn
+  - paralleltest
+  - scopelint
+  - testpackage
+  - varnamelen
+  - wsl

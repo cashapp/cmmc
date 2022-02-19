@@ -51,13 +51,16 @@ func init() {
 	//+kubebuilder:scaffold:scheme
 }
 
-func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
-	var probeAddr string
-	var mergeTargetMaxConcurrentReconciles int
-	var mergeSourceMaxConcurrentReconciles int
-	var displayHelp bool
+func main() { //nolint:funlen
+	var (
+		metricsAddr                        string
+		enableLeaderElection               bool
+		probeAddr                          string
+		mergeTargetMaxConcurrentReconciles int
+		mergeSourceMaxConcurrentReconciles int
+		displayHelp                        bool
+		opts                               = zap.Options{Development: true}
+	)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.IntVar(&mergeTargetMaxConcurrentReconciles, "merge-target-max-concurrent-reconciles", 1, "MergeTargetController - MaxConcurrentReconciles")
@@ -66,7 +69,6 @@ func main() {
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.BoolVar(&displayHelp, "help", false, "Display usage")
-	opts := zap.Options{Development: true}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
@@ -118,6 +120,7 @@ func main() {
 		setupLog.Error(err, "unable to set up health check")
 		os.Exit(1)
 	}
+
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
