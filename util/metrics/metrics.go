@@ -51,9 +51,11 @@ func (r *Recorder) RecordNumSources(o client.Object, count int) {
 // RecordReadyCondition records the ready condition.
 func (r *Recorder) RecordReadyCondition(o hasStatusCondition) {
 	condition := o.FindStatusCondition("Ready")
+
 	if condition == nil {
 		condition = &metav1.Condition{Type: "Ready", Status: metav1.ConditionUnknown}
 	}
+
 	r.RecordCondition(o, *condition)
 }
 
@@ -68,9 +70,11 @@ func (r *Recorder) RecordCondition(o client.Object, condition metav1.Condition) 
 			value  float64
 			status = string(status)
 		)
+
 		if string(condition.Status) == status {
 			value = 1
 		}
+
 		r.conditionGauge.With(resourceLables(o, prometheus.Labels{
 			"type":   condition.Type,
 			"status": status,

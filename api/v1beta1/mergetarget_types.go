@@ -61,7 +61,6 @@ func (m MergeTargetDataStatus) WithMaybeUpdatedInit(data string) MergeTargetData
 	c := m
 	if m.NewlyCreated == DataNewlyCreatedStatusYes && m.Init != data {
 		c.Init = data
-		return c
 	}
 
 	return c
@@ -116,6 +115,7 @@ type MergeTarget struct {
 // NamespacedTargetName gets the namespace target name for this MergeTarget.
 func (m *MergeTarget) NamespacedTargetName() (types.NamespacedName, error) {
 	n, err := util.NamespacedName(m.Spec.Target, m.Namespace)
+
 	return n, errors.WithStack(err)
 }
 
@@ -179,9 +179,11 @@ func (m *MergeTarget) ReduceDataState(
 	configMapData *map[string]string,
 ) (updatedKeys int, fieldsErrors []string) {
 	configMap := *configMapData
+
 	for k, v := range m.Status.Data {
 		// create & aggregate the data from the mergeSources
 		data := v.Init
+
 		for _, source := range mergeSources.Items {
 			if source.Spec.Target.Data == k {
 				data += source.Status.Output
@@ -209,6 +211,7 @@ func (m *MergeTarget) ReduceDataState(
 	}
 
 	*configMapData = configMap
+
 	return updatedKeys, fieldsErrors
 }
 

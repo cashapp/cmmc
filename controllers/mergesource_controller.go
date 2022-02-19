@@ -172,8 +172,7 @@ func (r *MergeSourceReconciler) finalizeDeletion(
 }
 
 func (r *MergeSourceReconciler) mergeSource(
-	ctx context.Context,
-	w *watchedConfigMap,
+	ctx context.Context, w *watchedConfigMap,
 ) (*MergeSource, error) {
 	var s cmmcv1beta1.MergeSource
 	err := r.Get(ctx, w.WatchedBy, &s)
@@ -185,10 +184,12 @@ func (r *MergeSourceReconciler) mergeSource(
 		return nil, errors.WithStack(err)
 	}
 
-	return nil, nil
+	return nil, nil //nolint:nilnil
 }
 
-func (r *MergeSourceReconciler) sources(ctx context.Context, s *cmmcv1beta1.MergeSource) ([]corev1.ConfigMap, error) {
+func (r *MergeSourceReconciler) sources(
+	ctx context.Context, s *cmmcv1beta1.MergeSource,
+) ([]corev1.ConfigMap, error) {
 	var sources corev1.ConfigMapList
 	if err := r.List(ctx, &sources, client.MatchingLabels(s.Spec.Selector)); err != nil {
 		return nil, errors.WithStack(err)
@@ -248,7 +249,7 @@ func (r *MergeSourceReconciler) configMapOutput(
 }
 
 // Delete the annotation if there is no merge source watching the configmap
-// Otherwise, remove the mergesource from the annotations
+// Otherwise, remove the mergesource from the annotations.
 func (r *MergeSourceReconciler) cleanUpWatchedByAnnotation(
 	ctx context.Context, cm *corev1.ConfigMap, name string,
 ) error {

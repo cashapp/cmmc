@@ -156,13 +156,12 @@ var _ = Describe("cmmc", func() {
 	)
 
 	Context("running the operator", func() {
-
 		assertConfigMapState := func(name types.NamespacedName, ms ...interface{}) {
 			Eventually(
 				func() (*configMapState, error) {
 					var cm corev1.ConfigMap
 					if err := k8sClient.Get(ctx, name, &cm); err != nil {
-						return nil, err
+						return nil, err // nolint:wrapcheck
 					}
 					anns := cm.GetAnnotations()
 					watchedBy := strings.Split(anns[string(watchedBy)], ",")
@@ -215,7 +214,7 @@ var _ = Describe("cmmc", func() {
 		})
 
 		When("creating a MergeTarget", func() {
-			It("can successfuly create a MergeTarget", func() {
+			It("can successfully create a MergeTarget", func() {
 				mergeTarget = cmmcv1beta1.NewMergeTarget(names.target, cmmcv1beta1.MergeTargetSpec{
 					Target: names.targetCM.String(),
 					Data:   map[string]cmmcv1beta1.MergeTargetDataSpec{"mapRoles": {}, "mapUsers": {}},
@@ -286,7 +285,7 @@ var _ = Describe("cmmc", func() {
 							if k8serrors.IsNotFound(err) {
 								return true, nil
 							}
-							return false, err
+							return false, err //nolint:wrapcheck
 						},
 						timeout,
 						interval,
@@ -310,10 +309,12 @@ type configMapState struct {
 	WatchedByAnnotation []string
 }
 
-type ManagedByAnnotation string
-type WatchedByAnnotation string
-type MapRoles string
-type MapUsers string
+type (
+	ManagedByAnnotation string
+	WatchedByAnnotation string
+	MapRoles            string
+	MapUsers            string
+)
 
 func HaveConfigMapState(params ...interface{}) gtypes.GomegaMatcher {
 	matchers := []gtypes.GomegaMatcher{}
@@ -349,6 +350,7 @@ const mapRoles1 = `
   username: test1
   groups: [ group1, group2 ]
 `
+
 const mapUsers1 = `
 - rolearn: friend
   username: test1
