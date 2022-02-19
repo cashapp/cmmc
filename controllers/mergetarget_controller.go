@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
@@ -317,7 +318,7 @@ func resourceStatusTargetIndexer(o client.Object) []string {
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *MergeTargetReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *MergeTargetReconciler) SetupWithManager(mgr ctrl.Manager, opts controller.Options) error {
 	ctx := context.Background()
 	if err := mgr.GetFieldIndexer().IndexField(
 		ctx, &cmmcv1beta1.MergeSource{}, fieldIndexStatusTarget, resourceStatusTargetIndexer,
@@ -328,6 +329,7 @@ func (r *MergeTargetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return errors.WithStack(
 		ctrl.NewControllerManagedBy(mgr).
 			For(&cmmcv1beta1.MergeTarget{}).
+			WithOptions(opts).
 			Watches(
 				&source.Kind{Type: &corev1.ConfigMap{}},
 				watchReconciliationEventHandler(managedByMergeTarget.ParseObjectName),

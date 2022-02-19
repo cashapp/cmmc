@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
@@ -310,10 +311,11 @@ func (r *MergeSourceReconciler) maybeRemoveWatchedAnnotation(
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *MergeSourceReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *MergeSourceReconciler) SetupWithManager(mgr ctrl.Manager, opts controller.Options) error {
 	return errors.WithStack(
 		ctrl.NewControllerManagedBy(mgr).
 			For(&cmmcv1beta1.MergeSource{}).
+			WithOptions(opts).
 			Watches(
 				&source.Kind{Type: &corev1.ConfigMap{}},
 				watchReconciliationEventHandler(
