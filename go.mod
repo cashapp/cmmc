@@ -11,9 +11,9 @@ require (
 	github.com/prometheus/client_golang v1.11.0
 	github.com/stretchr/testify v1.7.0
 	github.com/xeipuuv/gojsonschema v1.2.0
-	k8s.io/api v0.21.2
-	k8s.io/apimachinery v0.21.2
-	k8s.io/client-go v0.21.2
-	sigs.k8s.io/controller-runtime v0.9.1
+	k8s.io/api v0.22.2
+	k8s.io/apimachinery v0.22.2
+	k8s.io/client-go v0.22.2
+	sigs.k8s.io/controller-runtime v0.10.2
 	sigs.k8s.io/yaml v1.2.0
 )
