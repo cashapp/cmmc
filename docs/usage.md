@@ -25,12 +25,59 @@ namePrefix: cmmc-
 images:
 - name: controller
   newName: cashapp/cmmc
-  newTag: v0.0.2
+  newTag: SOME_VERSION
 
 resources:
 - path/to/config/crd
 - path/to/config/rbac
 - path/to/config/manager
+```
+
+### Customizing Arguments
+
+By default (if you're using the above kustomization), `cmmc` runs with the `--leader-select` flag.
+You can check [`main.go`][main] for available args or run `go run ./ --help`.
+
+```
+Usage of cmmc:
+  -health-probe-bind-address string
+    	The address the probe endpoint binds to. (default ":8081")
+  -help
+    	Display usage
+  -kubeconfig string
+    	Paths to a kubeconfig. Only required if out-of-cluster.
+  -leader-elect
+    	Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.
+  -merge-source-max-concurrent-reconciles int
+    	MergeSourceController - MaxConcurrentReconciles (default 1)
+  -merge-target-max-concurrent-reconciles int
+    	MergeTargetController - MaxConcurrentReconciles (default 1)
+  -metrics-bind-address string
+    	The address the metric endpoint binds to. (default ":8080")
+  -zap-devel
+    	Development Mode defaults(encoder=consoleEncoder,logLevel=Debug,stackTraceLevel=Warn). Production Mode defaults(encoder=jsonEncoder,logLevel=Info,stackTraceLevel=Error) (default true)
+  -zap-encoder value
+    	Zap log encoding (one of 'json' or 'console')
+  -zap-log-level value
+    	Zap Level to configure the verbosity of logging. Can be one of 'debug', 'info', 'error', or any integer value > 0 which corresponds to custom debug levels of increasing verbosity
+  -zap-stacktrace-level value
+    	Zap Level at and above which stacktraces are captured (one of 'info', 'error', 'panic').
+```
+
+You can override any arguments by providing patches to the configuration above:
+
+```yaml
+patches:
+- patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/args
+      value: [
+        "--leader-select",
+        "--merge-target-max-concurrent-reconciles", "1",
+        "--merge-source-max-concurrent-reconciles", "2",
+      ]
+  target:
+    name: controller-manager
 ```
 
 ## Metrics
@@ -55,4 +102,4 @@ adding [`config/prometheus`][3] to the list.
 [2]: https://github.com/cashapp/cmmc/tree/main/config
 [3]: https://github.com/cashapp/cmmc/blob/main/config/prometheus/monitor.yaml
 [crds]: https://github.com/cashapp/cmmc/tree/main/config/crds
-[metrics-issue]: https://github.com/cashapp/cmmc/issues/1
+[main]: https://github.com/cashapp/cmmc/blob/main/main.go#L53
