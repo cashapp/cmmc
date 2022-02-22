@@ -199,17 +199,18 @@ func (r *MergeSourceReconciler) sources(
 		return nil, nil
 	}
 
-	if len(s.Spec.NamespaceSelector) == 0 {
+	namespaceSelector := s.NamespaceSelector()
+	if len(namespaceSelector) == 0 {
 		return sources.Items, nil
 	}
 
 	var nsList corev1.NamespaceList
-	if err := r.List(ctx, &nsList, client.MatchingLabels(s.Spec.NamespaceSelector)); err != nil {
+	if err := r.List(ctx, &nsList, client.MatchingLabels(namespaceSelector)); err != nil {
 		return nil, errors.WithStack(err)
 	}
 
 	if len(nsList.Items) == 0 {
-		log.FromContext(ctx).Info("[WARN] found no matching namespaces, filtering all configMaps", "selector", s.Spec.NamespaceSelector)
+		log.FromContext(ctx).Info("[WARN] found no matching namespaces, filtering all configMaps", "selector", namespaceSelector)
 		return nil, nil
 	}
 
