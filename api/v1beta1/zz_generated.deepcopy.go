@@ -110,6 +110,13 @@ func (in *MergeSourceSpec) DeepCopyInto(out *MergeSourceSpec) {
 			(*out)[key] = val
 		}
 	}
+	if in.DeprecatedNamespaceSelector != nil {
+		in, out := &in.DeprecatedNamespaceSelector, &out.DeprecatedNamespaceSelector
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.NamespaceSelector != nil {
 		in, out := &in.NamespaceSelector, &out.NamespaceSelector
 		*out = make(map[string]string, len(*in))

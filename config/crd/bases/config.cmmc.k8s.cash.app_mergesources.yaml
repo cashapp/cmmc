@@ -48,6 +48,12 @@ spec:
               namespace_selector:
                 additionalProperties:
                   type: string
+                description: DeprecatedNamespaceSelector is deprecated in favor of
+                  NamespaceSelector.
+                type: object
+              namespaceSelector:
+                additionalProperties:
+                  type: string
                 description: "NamespaceSelector specifies what lables _must be_ on
                   the source ConfigMaps namespace, (if any) for this to become a valid
                   source. \n If omitted, will allow ConfigMaps from all namespaces."

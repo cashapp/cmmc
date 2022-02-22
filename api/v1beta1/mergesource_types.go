@@ -52,11 +52,14 @@ type MergeSourceSpec struct {
 	// Selector specifies what labels on a source ConfigMap the controller will be watching.
 	Selector map[string]string `json:"selector,omitempty"`
 
+	// DeprecatedNamespaceSelector is deprecated in favor of NamespaceSelector.
+	DeprecatedNamespaceSelector map[string]string `json:"namespace_selector,omitempty"` //nolint:tagliatelle
+
 	// NamespaceSelector specifies what lables _must be_ on the source ConfigMaps namespace,
 	// (if any) for this to become a valid source.
 	//
 	// If omitted, will allow ConfigMaps from all namespaces.
-	NamespaceSelector map[string]string `json:"namespace_selector,omitempty"` //nolint:tagliatelle
+	NamespaceSelector map[string]string `json:"namespaceSelector,omitempty"`
 
 	// Source describes which data key from the source ConfigMap we will be observing/merging.
 	Source MergeSourceSourceSpec `json:"source,omitempty"`
@@ -83,6 +86,16 @@ type MergeSource struct {
 
 	Spec   MergeSourceSpec   `json:"spec,omitempty"`
 	Status MergeSourceStatus `json:"status,omitempty"`
+}
+
+// NamespaceSelector gives us the NamespaceSelector for the MergeSource,
+// respecting both the deprecated (underscore) field, and the other.
+func (m *MergeSource) NamespaceSelector() map[string]string {
+	if m.Spec.DeprecatedNamespaceSelector != nil {
+		return m.Spec.DeprecatedNamespaceSelector
+	}
+
+	return m.Spec.NamespaceSelector
 }
 
 // NamespacedTargetName gets the types.NamespacedName representation given the
