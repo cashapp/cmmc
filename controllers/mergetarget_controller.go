@@ -118,7 +118,9 @@ func (r *MergeTargetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 // reconcileMergeTarget is the main function that ensures the target ConfigMap
 // has the state it needs to have given the MergeTarget resource.
-func (r *MergeTargetReconciler) reconcileMergeTarget(ctx context.Context, mtName string, mt *MergeTarget, cm *corev1.ConfigMap) (ctrl.Result, error) {
+func (r *MergeTargetReconciler) reconcileMergeTarget(
+	ctx context.Context, mtName string, mt *MergeTarget, cm *corev1.ConfigMap,
+) (ctrl.Result, error) {
 	var (
 		log                = log.FromContext(ctx)
 		setStatusCondition = func(c metav1.Condition) error {
@@ -132,11 +134,14 @@ func (r *MergeTargetReconciler) reconcileMergeTarget(ctx context.Context, mtName
 
 	log.Info("initialized/updated initial state of the target")
 
-	stats, err := r.reduceTargetState(ctx, mtName, mt, cm)
+	// N.B. We don't initially remove the keys to make sure the udpate
+	// goes through successfully before we cleanup the status.
+	keysToRemove, stats, err := r.reduceTargetState(ctx, mtName, mt, cm)
 	if err != nil {
 		return ctrl.Result{RequeueAfter: time.Minute}, errors.WithStack(err)
 	}
 
+	// record the status/condition of the things we are going to attempt to store.
 	r.Recorder.RecordNumSources(mt, stats.NumMergeSources)
 	stats.LogWithValues(log).Info("found and merged sources")
 	err = setStatusCondition(cmmcv1beta1.MergeTargetConditionValidation(stats.FieldsErrorMsgs, stats.NumMergeSources))
@@ -144,14 +149,18 @@ func (r *MergeTargetReconciler) reconcileMergeTarget(ctx context.Context, mtName
 		return ctrl.Result{Requeue: true}, errors.WithStack(err)
 	}
 
-	if stats.NumUpdatedKeys > 0 {
+	if stats.NumUpdatedKeys > 0 { // if we should be doing an update, let's do it
 		if err := r.Update(ctx, cm); err != nil {
 			_ = setStatusCondition(cmmcv1beta1.MergeTargetConditionErrorUpdating(err, stats.NumUpdatedKeys))
 			return ctrl.Result{RequeueAfter: time.Minute}, errors.Wrap(err, "failed updating target configMap")
 		}
 	}
 
-	err = setStatusCondition(cmmcv1beta1.MergeTargetConditionReady(len(stats.FieldsErrorMsgs) > 0))
+	// do Status cleanup, and set the right condition
+	mt.RemoveDataStatusKeys(keysToRemove)
+	mt.SetStatusCondition(cmmcv1beta1.MergeTargetConditionReady(len(stats.FieldsErrorMsgs) > 0))
+	err = r.Status().Update(ctx, mt)
+
 	return ctrl.Result{RequeueAfter: time.Minute}, errors.WithStack(err)
 }
 
@@ -169,29 +178,30 @@ func (m *mergeStats) LogWithValues(l logr.Logger) logr.Logger {
 	)
 }
 
-func (r *MergeTargetReconciler) updateDataStatus(ctx context.Context, mt *MergeTarget, cm *corev1.ConfigMap) error {
+func (r *MergeTargetReconciler) updateDataStatus(
+	ctx context.Context, mt *MergeTarget, cm *corev1.ConfigMap,
+) error {
 	mt.UpdateDataStatus(cm.Data)
 	return errors.Wrap(r.Status().Update(ctx, mt), "failed updating initial status")
 }
 
-func (r *MergeTargetReconciler) setStatusCondition(ctx context.Context, mt *MergeTarget, c metav1.Condition) error {
+func (r *MergeTargetReconciler) setStatusCondition(
+	ctx context.Context, mt *MergeTarget, c metav1.Condition,
+) error {
 	mt.SetStatusCondition(c)
 	return errors.Wrapf(r.Status().Update(ctx, mt), "error updating condition type %s", c.Type)
 }
 
 func (r *MergeTargetReconciler) reduceTargetState(
-	ctx context.Context,
-	name string,
-	mergeTarget *cmmcv1beta1.MergeTarget,
-	targetConfigMap *corev1.ConfigMap,
-) (*mergeStats, error) {
+	ctx context.Context, name string, mt *MergeTarget, targetConfigMap *corev1.ConfigMap,
+) ([]string, *mergeStats, error) {
 	var mergeSources cmmcv1beta1.MergeSourceList
-	if err := r.List(ctx, &mergeSources, client.MatchingFields{"status.target": name}); err != nil {
-		return nil, errors.Wrapf(err, "failed fetching MergeSource list for %s", name)
+	if err := r.List(ctx, &mergeSources, client.MatchingFields{fieldIndexStatusTarget: name}); err != nil {
+		return nil, nil, errors.Wrapf(err, "failed fetching MergeSource list for %s", name)
 	}
 
-	numUpdatedKeys, errorsOnFields := mergeTarget.ReduceDataState(mergeSources, &targetConfigMap.Data)
-	return &mergeStats{
+	statusKeysToRemove, numUpdatedKeys, errorsOnFields := mt.ReduceDataState(mergeSources, &targetConfigMap.Data)
+	return statusKeysToRemove, &mergeStats{
 		NumUpdatedKeys:  numUpdatedKeys,
 		NumMergeSources: len(mergeSources.Items),
 		FieldsErrorMsgs: errorsOnFields,
@@ -199,10 +209,7 @@ func (r *MergeTargetReconciler) reduceTargetState(
 }
 
 func (r *MergeTargetReconciler) targetConfigMap(
-	ctx context.Context,
-	mergeTarget *cmmcv1beta1.MergeTarget,
-	name types.NamespacedName,
-	managedByName string,
+	ctx context.Context, mergeTarget *MergeTarget, name types.NamespacedName, managedByName string,
 ) (*corev1.ConfigMap, bool, error) {
 	var cm corev1.ConfigMap
 	if err := r.Get(ctx, name, &cm); err != nil {

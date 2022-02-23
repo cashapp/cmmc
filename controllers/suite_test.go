@@ -232,6 +232,24 @@ var _ = Describe("cmmc", func() {
 			})
 		})
 
+		When("removing a key in a MergeTarget", func() {
+			It("can successfully delete a key", func() {
+				Expect(k8sClient.Get(ctx, names.target, mergeTarget)).Should(Succeed())
+				delete(mergeTarget.Spec.Data, "mapUsers")
+				Expect(k8sClient.Update(ctx, mergeTarget)).Should(Succeed())
+			})
+
+			It("should remove the key in the target", func() {
+				assertConfigMapState(names.targetCM, MapUsers(""))
+			})
+
+			It("can add the key back", func() { // for the rest of the tests
+				Expect(k8sClient.Get(ctx, names.target, mergeTarget)).Should(Succeed())
+				mergeTarget.Spec.Data["mapUsers"] = cmmcv1beta1.MergeTargetDataSpec{}
+				Expect(k8sClient.Update(ctx, mergeTarget)).Should(Succeed())
+			})
+		})
+
 		Context("cleanup", func() {
 			When("removing roles MergeSource", func() {
 				It("can be deleted", func() {

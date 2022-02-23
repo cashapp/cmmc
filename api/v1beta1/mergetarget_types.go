@@ -174,16 +174,39 @@ func (m *MergeTarget) UpdateDataStatus(configMapData map[string]string) {
 	}
 }
 
+// ReduceDataState mutates configMapData, accumulating the MergeSourceList into the
+// respective keys.
+// nolint:cyclop
 func (m *MergeTarget) ReduceDataState(
-	mergeSources MergeSourceList,
-	configMapData *map[string]string,
-) (updatedKeys int, fieldsErrors []string) {
+	mergeSources MergeSourceList, configMapData *map[string]string,
+) (statusKeysToRemove []string, updatedKeys int, fieldsErrors []string) {
 	configMap := *configMapData
 
 	for k, v := range m.Status.Data {
+		//
+		// If the Spec for the MergeTarget no longer has the key
+		// specified, we revert the configMap to its original state,
+		// either the initial data for that key, or removing it entirely.
+		//
+		// This will end up keeping the status key, which we want to do
+		// until we are confident that the CM has been reverted successfully.
+		if _, ok := m.Spec.Data[k]; !ok {
+			existingValue, exists := configMap[k]
+			if !exists && v.IsStatusNewlyCreated() {
+				// do nothing, this is all good, it doesn't exist
+				// and it was supposed to be newly created/managed by the MergeTarget
+			} else if existingValue != v.Init {
+				configMap[k] = v.Init
+				updatedKeys++
+			}
+
+			statusKeysToRemove = append(statusKeysToRemove, k)
+			continue
+		}
+
+		//
 		// create & aggregate the data from the mergeSources
 		data := v.Init
-
 		for _, source := range mergeSources.Items {
 			if source.Spec.Target.Data == k {
 				data += source.Status.Output
@@ -212,7 +235,13 @@ func (m *MergeTarget) ReduceDataState(
 
 	*configMapData = configMap
 
-	return updatedKeys, fieldsErrors
+	return statusKeysToRemove, updatedKeys, fieldsErrors
+}
+
+func (m *MergeTarget) RemoveDataStatusKeys(keys []string) {
+	for _, k := range keys {
+		delete(m.Status.Data, k)
+	}
 }
 
 func NewMergeTarget(name types.NamespacedName, spec MergeTargetSpec) *MergeTarget {
