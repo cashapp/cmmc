@@ -4,17 +4,24 @@ linters:
   enable-all: true
   disable:
   - exhaustivestruct
+  - exhaustruct
   - gci
   - gochecknoglobals
   - gochecknoinits
+  - gofmt
   - golint
+  - ifshort
   - interfacer
   - ireturn
   - lll
   - maligned
   - nlreturn
+  - nonamedreturns
   - paralleltest
   - scopelint
+  - structcheck
   - testpackage
+  - varcheck
   - varnamelen
   - wsl
+  - deadcode

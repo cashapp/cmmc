@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 // Package v1beta1 contains API Schema definitions for the cmmc v1beta1 API group
-//+kubebuilder:object:generate=true
-//+groupName=config.cmmc.k8s.cash.app
+// +kubebuilder:object:generate=true
+// +groupName=config.cmmc.k8s.cash.app
 package v1beta1
 
 import (

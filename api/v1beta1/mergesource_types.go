@@ -34,7 +34,6 @@ type MergeSourceSourceSpec struct {
 
 // MergeSourceTargetSpec describes the MergeTarget a MergeSource will target.
 type MergeSourceTargetSpec struct {
-
 	// Name specifies the MergeTarget we will attempt to write to (if it exists).
 	Name string `json:"name,omitempty"`
 
@@ -48,7 +47,6 @@ type MergeSourceTargetSpec struct {
 // Manily, which ConfigMap resources to watch, which key it will be
 // aggregating data from, and which MergeTarget it will be writing to.
 type MergeSourceSpec struct {
-
 	// Selector specifies what labels on a source ConfigMap the controller will be watching.
 	Selector map[string]string `json:"selector,omitempty"`
 

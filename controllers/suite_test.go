@@ -161,7 +161,7 @@ var _ = Describe("cmmc", func() {
 				func() (*configMapState, error) {
 					var cm corev1.ConfigMap
 					if err := k8sClient.Get(ctx, name, &cm); err != nil {
-						return nil, err // nolint:wrapcheck
+						return nil, err //nolint:wrapcheck
 					}
 					anns := cm.GetAnnotations()
 					watchedBy := strings.Split(anns[string(watchedBy)], ",")
