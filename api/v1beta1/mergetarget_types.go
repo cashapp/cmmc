@@ -174,9 +174,9 @@ func (m *MergeTarget) UpdateDataStatus(configMapData map[string]string) {
 	}
 }
 
-// ReduceDataState mutates configMapData, accumulating the MergeSourceList into the
-// respective keys.
-// nolint:cyclop
+// ReduceDataState mutates configMapData, accumulating the MergeSourceList into the respective keys.
+//
+//nolint:cyclop
 func (m *MergeTarget) ReduceDataState(
 	mergeSources MergeSourceList, configMapData *map[string]string,
 ) (statusKeysToRemove []string, updatedKeys int, fieldsErrors []string) {

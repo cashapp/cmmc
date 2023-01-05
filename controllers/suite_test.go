@@ -56,6 +56,9 @@ var (
 	cfg       *rest.Config
 	k8sClient client.Client
 	testEnv   *envtest.Environment
+
+	ctx    context.Context
+	cancel context.CancelFunc
 )
 
 func TestAPIs(t *testing.T) {
@@ -109,8 +112,10 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager, controller.Options{})
 	Expect(err).ToNot(HaveOccurred())
 
+	ctx, cancel = context.WithCancel(ctrl.SetupSignalHandler())
+
 	go func() {
-		err = k8sManager.Start(ctrl.SetupSignalHandler())
+		err = k8sManager.Start(ctx)
 		Expect(err).ToNot(HaveOccurred())
 	}()
 })
@@ -161,7 +166,7 @@ var _ = Describe("cmmc", func() {
 				func() (*configMapState, error) {
 					var cm corev1.ConfigMap
 					if err := k8sClient.Get(ctx, name, &cm); err != nil {
-						return nil, err // nolint:wrapcheck
+						return nil, err //nolint:wrapcheck
 					}
 					anns := cm.GetAnnotations()
 					watchedBy := strings.Split(anns[string(watchedBy)], ",")
@@ -315,6 +320,7 @@ var _ = Describe("cmmc", func() {
 })
 
 var _ = AfterSuite(func() {
+	cancel()
 	By("tearing down the test environment")
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
