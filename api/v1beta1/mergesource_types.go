@@ -83,7 +83,7 @@ type MergeSource struct {
 	Status MergeSourceStatus `json:"status,omitempty"`
 }
 
-// NamespaceSelector gives us the NamespaceSelector for the MergeSource
+// NamespaceSelector gives us the NamespaceSelector for the MergeSource.
 func (m *MergeSource) NamespaceSelector() map[string]string {
 	return m.Spec.NamespaceSelector
 }
