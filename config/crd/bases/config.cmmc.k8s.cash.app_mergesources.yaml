@@ -44,12 +44,6 @@ spec:
               Manily, which ConfigMap resources to watch, which key it will be aggregating
               data from, and which MergeTarget it will be writing to.
             properties:
-              namespace_selector:
-                additionalProperties:
-                  type: string
-                description: DeprecatedNamespaceSelector is deprecated in favor of
-                  NamespaceSelector.
-                type: object
               namespaceSelector:
                 additionalProperties:
                   type: string
