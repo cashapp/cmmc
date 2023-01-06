@@ -6,8 +6,19 @@ site_url: https://cashapp.github.io/cmmc/
 theme:
   name: material
   palette:
-    primary: red
-    accent: blue
+    # Palette toggle for light mode
+    - scheme: default
+      primary: red
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: red
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
   features:
   - navigation.sections
 
