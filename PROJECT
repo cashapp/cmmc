@@ -1,6 +1,5 @@
 domain: cmmc.k8s.cash.app
-layout:
-- go.kubebuilder.io/v3
+layout: go.kubebuilder.io/v3
 projectName: cmmc
 repo: github.com/cashapp/cmmc
 resources:
