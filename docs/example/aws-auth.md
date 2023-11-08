@@ -75,7 +75,7 @@ metadata:
     cmmc.k8s.cash.app/merge: "aws-auth-map-roles"
 data:
   mapRoles: |
-    - arn: arn:aws:iam::111122223333:role/external-user-service-a
+    - rolearn: arn:aws:iam::111122223333:role/external-user-service-a
       username: service-a-external
       groups:
       - service-a
@@ -89,7 +89,7 @@ metadata:
     cmmc.k8s.cash.app/merge: "aws-auth-map-roles"
 data:
   mapRoles: |
-    - arn: arn:aws:iam::111122223333:role/external-user-service-b
+    - rolearn: arn:aws:iam::111122223333:role/external-user-service-b
       username: service-b-external
       groups:
       - service-b
@@ -108,11 +108,11 @@ kubectl get cm -n kube-system aws-auth -o yaml
 apiVersion: v1
 data:
   mapRoles: |
-    - arn: arn:aws:iam::111122223333:role/external-user-service-b
+    - rolearn: arn:aws:iam::111122223333:role/external-user-service-b
       username: service-b-external
       groups:
       - service-b
-    - arn: arn:aws:iam::111122223333:role/external-user-service-a
+    - rolearn: arn:aws:iam::111122223333:role/external-user-service-a
       username: service-a-external
       groups:
       - service-a
