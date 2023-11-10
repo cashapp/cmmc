@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	cmmcv1beta1 "github.com/cashapp/cmmc/api/v1beta1"
@@ -327,6 +328,13 @@ func (r *MergeSourceReconciler) SetupWithManager(mgr ctrl.Manager, opts controll
 						return n, true
 					},
 				),
-			).Complete(r),
+			).
+			WithEventFilter(predicate.Or(
+				predicate.GenerationChangedPredicate{},
+				predicate.ResourceVersionChangedPredicate{},
+				predicate.LabelChangedPredicate{},
+			),
+			).
+			Complete(r),
 	)
 }

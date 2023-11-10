@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/go-logr/logr"
@@ -131,6 +132,8 @@ func (r *MergeTargetReconciler) reconcileMergeTarget(
 	if err := r.updateDataStatus(ctx, mt, cm); err != nil {
 		return ctrl.Result{Requeue: true}, errors.Wrap(err, "failed updating MergeTarget Status")
 	}
+
+	fmt.Println("\n\n", mtName, mt, "~~~")
 
 	log.Info("initialized/updated initial state of the target")
 
@@ -344,6 +347,12 @@ func (r *MergeTargetReconciler) SetupWithManager(mgr ctrl.Manager, opts controll
 			Watches(
 				&source.Kind{Type: &cmmcv1beta1.MergeSource{}},
 				watchReconciliationEventHandler(cmmcv1beta1.MergeSourceNamespacedTargetName),
+			).
+			WithEventFilter(predicate.Or(
+				predicate.GenerationChangedPredicate{},
+				predicate.ResourceVersionChangedPredicate{},
+				predicate.LabelChangedPredicate{},
+			),
 			).
 			Complete(r),
 	)
