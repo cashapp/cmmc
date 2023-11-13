@@ -109,7 +109,7 @@ func main() { //nolint:funlen
 		Scheme:   mgr.GetScheme(),
 		Recorder: recorder,
 	}).SetupWithManager(mgr, controller.Options{
-		MaxConcurrentReconciles: mergeSourceMaxConcurrentReconciles,
+		MaxConcurrentReconciles: mergeTargetMaxConcurrentReconciles,
 	}); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MergeTarget")
 		os.Exit(1)
