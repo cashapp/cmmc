@@ -94,6 +94,7 @@ func (r *MergeSourceReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	return ctrl.Result{RequeueAfter: time.Minute}, nil
 }
 
+//nolint:funlen
 func (r *MergeSourceReconciler) reconcileMergeSource(
 	ctx context.Context, mergeSource *MergeSource, watched *watchedConfigMap,
 ) (bool, error) {
@@ -141,9 +142,21 @@ func (r *MergeSourceReconciler) reconcileMergeSource(
 		output += data
 	}
 
-	mergeSource.Status.Output = output
-	mergeSource.SetStatusCondition(cmmcv1beta1.MergeSourceConditionReady(len(sources)))
-	if err := r.Status().Update(ctx, mergeSource); err != nil {
+	// Retrieve new copy of the current MergeSource so that we're updating the most recent
+	// version of the resource when we update its status.
+	ms := &cmmcv1beta1.MergeSource{}
+	err = r.Get(ctx, types.NamespacedName{
+		Namespace: mergeSource.Namespace,
+		Name:      mergeSource.Name,
+	}, ms)
+	if err != nil {
+		return false, errors.Wrapf(err, "error retrieving mergeSource %s during status update phase", mergeSource.Name)
+	}
+
+	// Use the newly retrieved MergeSource to update the status.
+	ms.Status.Output = output
+	ms.SetStatusCondition(cmmcv1beta1.MergeSourceConditionReady(len(sources)))
+	if err = r.Status().Update(ctx, ms); err != nil {
 		return false, errors.Wrap(err, "failed updating status after accumulating watched resources")
 	}
 
@@ -260,7 +273,23 @@ func (r *MergeSourceReconciler) cleanUpWatchedByAnnotation(
 func (r *MergeSourceReconciler) annotateWatchedByConfigMap(
 	ctx context.Context, cm *corev1.ConfigMap, name string,
 ) error {
-	return errors.WithStack(anns.Apply(ctx, r.Client, cm, watchedBy.AddToList(name)))
+	// Retrieve the latest copy of the configmap we're looking to update
+	// before triggering the update to prevent errors with updating a resource
+	// without the most recent changes
+	currentCm := &corev1.ConfigMap{}
+	err := r.Get(ctx, types.NamespacedName{
+		Namespace: cm.Namespace,
+		Name:      cm.Name,
+	}, currentCm)
+	if err != nil {
+		// If not found, the ConfigMap has been deleted
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return errors.Wrapf(err, "error retrieving configmap %s for watched annotation update", cm.Name)
+	}
+
+	return errors.WithStack(anns.Apply(ctx, r.Client, currentCm, watchedBy.AddToList(name)))
 }
 
 type watchedConfigMap struct {
