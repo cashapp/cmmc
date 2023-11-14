@@ -141,9 +141,21 @@ func (r *MergeSourceReconciler) reconcileMergeSource(
 		output += data
 	}
 
-	mergeSource.Status.Output = output
-	mergeSource.SetStatusCondition(cmmcv1beta1.MergeSourceConditionReady(len(sources)))
-	if err := r.Status().Update(ctx, mergeSource); err != nil {
+	// Retrieve new copy of the current MergeSource so that we're updating the most recent
+	// version of the resource when we update its status.
+	ms := &cmmcv1beta1.MergeSource{}
+	err = r.Get(ctx, types.NamespacedName{
+		Namespace: mergeSource.Namespace,
+		Name:      mergeSource.Name,
+	}, ms)
+	if err != nil {
+		return false, errors.Wrapf(err, "error retrieving mergeSource %s during status update phase", mergeSource.Name)
+	}
+
+	// Use the newly retrieved MergeSource to update the status.
+	ms.Status.Output = output
+	ms.SetStatusCondition(cmmcv1beta1.MergeSourceConditionReady(len(sources)))
+	if err = r.Status().Update(ctx, ms); err != nil {
 		return false, errors.Wrap(err, "failed updating status after accumulating watched resources")
 	}
 
