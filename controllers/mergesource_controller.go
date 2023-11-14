@@ -272,7 +272,23 @@ func (r *MergeSourceReconciler) cleanUpWatchedByAnnotation(
 func (r *MergeSourceReconciler) annotateWatchedByConfigMap(
 	ctx context.Context, cm *corev1.ConfigMap, name string,
 ) error {
-	return errors.WithStack(anns.Apply(ctx, r.Client, cm, watchedBy.AddToList(name)))
+	// Retrieve the latest copy of the configmap we're looking to update
+	// before triggering the update to prevent errors with updating a resource
+	// without the most recent changes
+	currentCm := &corev1.ConfigMap{}
+	err := r.Get(ctx, types.NamespacedName{
+		Namespace: cm.Namespace,
+		Name:      cm.Name,
+	}, currentCm)
+	if err != nil {
+		// If not found, the ConfigMap has been deleted
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return errors.Wrapf(err, "error retrieving configmap %s for watched annotation update", cm.Name)
+	}
+
+	return errors.WithStack(anns.Apply(ctx, r.Client, currentCm, watchedBy.AddToList(name)))
 }
 
 type watchedConfigMap struct {
