@@ -94,6 +94,7 @@ func (r *MergeSourceReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	return ctrl.Result{RequeueAfter: time.Minute}, nil
 }
 
+//nolint:funlen
 func (r *MergeSourceReconciler) reconcileMergeSource(
 	ctx context.Context, mergeSource *MergeSource, watched *watchedConfigMap,
 ) (bool, error) {
